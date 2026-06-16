@@ -37,7 +37,7 @@
   },
   "devDependencies": {
     "lefthook": "^1.13.6",
-    "markdownlint-cli2": "^0.18.1",
+    "markdownlint-cli2": "^0.22.1",
     "prettier": "^3.6.2"
   },
   "engines": {

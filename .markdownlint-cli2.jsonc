@@ -8,6 +8,7 @@
     "MD026": false,
     "MD033": false,
     "MD041": false,
+    "MD060": false,
   },
   "globs": ["**/*.md"],
   "ignores": ["node_modules/**", "dist/**", "build/**", "coverage/**"],
