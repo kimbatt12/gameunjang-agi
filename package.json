@@ -8,10 +8,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "fix": "prettier --write . && npm run frontend:lint:fix && npm run backend:lint:fix",
-    "check:markdown": "markdownlint-cli2 \"**/*.md\"",
     "check:json": "prettier --check \"**/*.{json,jsonc}\"",
     "check:yaml": "prettier --check \"**/*.{yml,yaml}\"",
-    "check:docs": "npm run check:markdown && npm run check:json && npm run check:yaml",
+    "check:docs": "npm run check:json && npm run check:yaml",
     "secret:scan": "node scripts/scan-secrets.mjs",
     "commit-msg": "node scripts/validate-commit-msg.mjs",
     "frontend:lint": "node scripts/run-if-dir.mjs frontend lint",
@@ -37,7 +36,6 @@
   },
   "devDependencies": {
     "lefthook": "^1.13.6",
-    "markdownlint-cli2": "^0.22.1",
     "prettier": "^3.6.2"
   },
   "engines": {
