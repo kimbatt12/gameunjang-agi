@@ -1,0 +1,22 @@
+file-save:
+  parallel: true
+  commands:
+    fix:
+      run: npm run fix
+
+pre-commit:
+  parallel: false
+  commands:
+    precommit:
+      run: npm run precommit
+
+pre-push:
+  parallel: false
+  commands:
+    prepush:
+      run: npm run prepush
+
+commit-msg:
+  commands:
+    conventional-commit:
+      run: npm run commit-msg -- {1}
