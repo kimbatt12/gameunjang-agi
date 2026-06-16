@@ -24,10 +24,16 @@ if (!existsSync(packagePath)) {
 const packageJson = JSON.parse(readFileSync(packagePath, "utf8"));
 const scripts = packageJson.scripts ?? {};
 const scriptName = candidateScripts.find((name) => scripts[name]);
+const optionalScripts = new Set(["lint:fix"]);
 
 if (!scriptName) {
-  console.log(`skip: ${dir} has none of scripts: ${candidateScripts.join(", ")}`);
-  process.exit(0);
+  if (candidateScripts.every((name) => optionalScripts.has(name))) {
+    console.log(`skip: ${dir} has none of optional scripts: ${candidateScripts.join(", ")}`);
+    process.exit(0);
+  }
+
+  console.error(`error: ${dir} has none of required scripts: ${candidateScripts.join(", ")}`);
+  process.exit(1);
 }
 
 const result = spawnSync("npm", ["--prefix", dir, "run", scriptName], {

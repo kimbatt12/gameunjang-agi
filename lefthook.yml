@@ -1,9 +1,3 @@
-file-save:
-  parallel: true
-  commands:
-    fix:
-      run: npm run fix
-
 pre-commit:
   parallel: false
   commands:
