@@ -1,0 +1,180 @@
+#!/usr/bin/env bash
+set -u
+
+abort() {
+  printf 'pre-push: %s\n' "$1" >&2
+  exit 1
+}
+
+review_context=""
+validation_root=""
+
+cleanup() {
+  if [ -n "$review_context" ]; then
+    rm -f "$review_context"
+  fi
+
+  if [ -n "$validation_root" ]; then
+    git worktree remove --force "$validation_root" >/dev/null 2>&1 || rm -rf "$validation_root"
+  fi
+}
+
+trap cleanup EXIT
+
+run_validation() {
+  validation_path=$1
+  diff_base=$2
+
+  printf 'pre-push: running git diff --check...\n' >&2
+  (cd "$validation_path" && git diff --check "$diff_base" HEAD) || abort "git diff --check failed; push blocked."
+
+  if [ -f "$validation_path/frontend/package.json" ]; then
+    if ! command -v npm >/dev/null 2>&1; then
+      abort "frontend/package.json exists but npm is not installed or not on PATH."
+    fi
+
+    if ! command -v node >/dev/null 2>&1; then
+      abort "frontend/package.json exists but node is not installed or not on PATH."
+    fi
+
+    if ! node -e "process.exit(process.versions.node.split('.')[0] === '24' ? 0 : 1);"; then
+      abort "frontend validation requires Node 24.x to match CI."
+    fi
+
+    printf 'pre-push: frontend/package.json found; installing frontend dependencies...\n' >&2
+    npm ci --prefix "$validation_path/frontend" || abort "npm ci --prefix frontend failed; push blocked."
+
+    for script in lint typecheck test build; do
+      if (cd "$validation_path" && node -e "const scripts = require('./frontend/package.json').scripts || {}; process.exit(Object.prototype.hasOwnProperty.call(scripts, process.argv[1]) ? 0 : 1);" "$script"); then
+        printf 'pre-push: running frontend %s script...\n' "$script" >&2
+        npm run --prefix "$validation_path/frontend" "$script" || abort "frontend $script script failed; push blocked."
+      else
+        printf 'pre-push: skipping frontend %s script; not defined in frontend/package.json.\n' "$script" >&2
+      fi
+    done
+  else
+    printf 'pre-push: skipping frontend validation; frontend/package.json not found.\n' >&2
+  fi
+
+  if [ -f "$validation_path/backend/pyproject.toml" ]; then
+    if ! command -v python >/dev/null 2>&1; then
+      abort "backend/pyproject.toml exists but python is not installed or not on PATH."
+    fi
+
+    if ! python -c "import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 14) else 1)"; then
+      abort "backend validation requires Python 3.14 to match CI."
+    fi
+
+    printf 'pre-push: backend/pyproject.toml found; installing backend dependencies...\n' >&2
+    python -m venv "$validation_path/backend/.pre-push-venv" || abort "backend virtual environment creation failed; push blocked."
+    backend_python="$validation_path/backend/.pre-push-venv/bin/python"
+    (cd "$validation_path/backend" && "$backend_python" -m pip install --upgrade pip) || abort "backend pip upgrade failed; push blocked."
+    if ! (cd "$validation_path/backend" && "$backend_python" -m pip install -e '.[dev]'); then
+      printf "pre-push: backend dev install failed; falling back to base editable install...\n" >&2
+      (cd "$validation_path/backend" && "$backend_python" -m pip install -e .) || abort "backend editable install failed; push blocked."
+    fi
+    (cd "$validation_path/backend" && "$backend_python" -m pip install ruff pytest) || abort "backend validation dependency install failed; push blocked."
+
+    printf 'pre-push: running backend ruff check...\n' >&2
+    (cd "$validation_path/backend" && "$backend_python" -m ruff check .) || abort "backend ruff check failed; push blocked."
+    printf 'pre-push: running backend ruff format --check...\n' >&2
+    (cd "$validation_path/backend" && "$backend_python" -m ruff format --check .) || abort "backend ruff format --check failed; push blocked."
+    printf 'pre-push: running backend pytest...\n' >&2
+    (cd "$validation_path/backend" && "$backend_python" -m pytest) || abort "backend pytest failed; push blocked."
+  else
+    printf 'pre-push: skipping backend validation; backend/pyproject.toml not found.\n' >&2
+  fi
+}
+
+prepare_validation_worktree() {
+  validation_root=$(mktemp -d "${TMPDIR:-/tmp}/pre-push-validation.XXXXXX") || abort "failed to create temporary validation worktree path."
+  git worktree add --detach --quiet "$validation_root" HEAD || abort "failed to create temporary validation worktree."
+}
+
+remote_name=${1:-unknown}
+remote_url=${2:-unknown}
+
+repo_root=$(git rev-parse --show-toplevel 2>/dev/null) || abort "failed to locate git repository root."
+cd "$repo_root" || abort "failed to enter repository root: $repo_root"
+
+current_branch=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)
+base_ref=""
+
+if [ -n "$current_branch" ]; then
+  base_ref=$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true)
+fi
+
+if [ -z "$base_ref" ]; then
+  if git rev-parse --verify --quiet origin/main >/dev/null; then
+    base_ref="origin/main"
+  else
+    abort "no upstream branch or origin/main found; set an upstream or fetch origin/main before pushing."
+  fi
+fi
+
+merge_base=$(git merge-base HEAD "$base_ref" 2>/dev/null) || abort "failed to compute merge base with $base_ref."
+
+prepare_validation_worktree
+run_validation "$validation_root" "$merge_base"
+git worktree remove --force "$validation_root" >/dev/null 2>&1 || abort "failed to remove temporary validation worktree."
+validation_root=""
+
+if ! command -v opencode >/dev/null 2>&1; then
+  abort "opencode is not installed or not on PATH; install opencode or fix PATH before pushing."
+fi
+
+review_context=$(mktemp "${TMPDIR:-/tmp}/opencode-pre-push-review.XXXXXX") || abort "failed to create temporary review context."
+
+if [ -t 0 ]; then
+  push_updates="(no pre-push stdin; hook may have been run manually)"
+else
+  push_updates=""
+  while read -r local_ref local_sha remote_ref remote_sha; do
+    push_updates="${push_updates}${local_ref:-?} ${local_sha:-?} -> ${remote_ref:-?} ${remote_sha:-?}\n"
+  done
+  if [ -z "$push_updates" ]; then
+    push_updates="(no pre-push ref updates provided on stdin)"
+  fi
+fi
+
+{
+  printf '# Pre-push code review context\n\n'
+  printf '%s\n' "- Remote: $remote_name ($remote_url)"
+  printf '%s\n' "- Current branch: ${current_branch:-DETACHED_HEAD}"
+  printf '%s\n' "- Review base: $base_ref"
+  printf '%s\n\n' "- Merge base: $merge_base"
+  printf '## Push updates\n\n%b\n\n' "$push_updates"
+  printf '## Working tree status\n\n```text\n'
+  git status --short
+  printf '```\n\n'
+  printf '## Diff stat (%s..HEAD)\n\n```text\n' "$merge_base"
+  git diff --stat "$merge_base" HEAD
+  printf '```\n\n'
+  printf '## Diff (%s..HEAD)\n\n```diff\n' "$merge_base"
+  git diff --find-renames "$merge_base" HEAD
+  printf '```\n'
+} >"$review_context" || abort "failed to prepare review context."
+
+review_prompt="Review the attached pre-push diff context in read-only mode as the code-reviewer agent. Focus on whether this push should be blocked for correctness, security, repository-rule, or validation issues. Do not edit files, stage changes, commit, or push. The final line must be exactly either 'PUSH_REVIEW_STATUS: pass' or 'PUSH_REVIEW_STATUS: fail'."
+
+printf 'pre-push: running opencode code-reviewer against %s..HEAD...\n' "$merge_base" >&2
+if ! review_output=$(opencode run --agent code-reviewer "$review_prompt" --file "$review_context" 2>&1); then
+  printf '%s\n' "$review_output" >&2
+  abort "opencode code-reviewer failed to run; push blocked."
+fi
+
+printf '%s\n' "$review_output" >&2
+last_line=$(printf '%s\n' "$review_output" | sed '/^[[:space:]]*$/d' | tail -n 1)
+
+case "$last_line" in
+  'PUSH_REVIEW_STATUS: pass')
+    printf 'pre-push: code-reviewer passed.\n' >&2
+    exit 0
+    ;;
+  'PUSH_REVIEW_STATUS: fail')
+    abort "code-reviewer reported fail; push blocked."
+    ;;
+  *)
+    abort "code-reviewer did not end with a valid PUSH_REVIEW_STATUS line; push blocked."
+    ;;
+esac
