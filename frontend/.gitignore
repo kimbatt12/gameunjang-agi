@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+.next/
+out/
+coverage/
+
+# Frontend tool caches
+.turbo/
+.vite/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+.prettier-cache/

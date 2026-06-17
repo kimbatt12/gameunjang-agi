@@ -19,20 +19,38 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install package dependencies
+      - name: Validate frontend package
         run: |
-          for dir in frontend backend; do
-            if [ -f "$dir/package.json" ]; then
-              npm ci --prefix "$dir"
-            else
-              echo "skip: $dir/package.json does not exist"
-            fi
-          done
+          if [ -f frontend/package.json ]; then
+            npm ci --prefix frontend
+            for script in lint typecheck test build; do
+              if node -e "const pkg = require('./frontend/package.json'); process.exit(pkg.scripts && pkg.scripts[process.argv[1]] ? 0 : 1)" "$script"; then
+                npm run "$script" --prefix frontend
+              else
+                echo "skip: frontend package has no $script script"
+              fi
+            done
+          else
+            echo "skip: frontend/package.json does not exist"
+          fi
 
-      - name: Run validation
-        run: npm run ci
+      - name: Validate backend Node package
+        run: |
+          # Backend stack is not fixed yet. Only run npm checks when backend is a Node package.
+          if [ -f backend/package.json ]; then
+            npm ci --prefix backend
+            for script in lint typecheck test build; do
+              if node -e "const pkg = require('./backend/package.json'); process.exit(pkg.scripts && pkg.scripts[process.argv[1]] ? 0 : 1)" "$script"; then
+                npm run "$script" --prefix backend
+              else
+                echo "skip: backend package has no $script script"
+              fi
+            done
+          else
+            if [ -d backend ]; then
+              echo "skip: backend is present without package.json; add stack-specific CI when selected"
+            else
+              echo "skip: backend/package.json does not exist"
+            fi
+          fi

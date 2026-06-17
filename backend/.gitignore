@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.venv/
+venv/
+htmlcov/
+
+# Node
+node_modules/
+dist/
+build/
+coverage/
+.turbo/
+.eslintcache
+.prettier-cache/
+
+# Java
+target/
+build/
+.gradle/
+out/
+*.class
+
+# Backend runtime output
+logs/
+*.log
