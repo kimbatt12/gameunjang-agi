@@ -15,6 +15,13 @@
 - Do not add root npm orchestration unless both apps explicitly need a shared Node-based workflow.
 - Application docs should not be modified for tooling-only work unless a setup reference is explicitly needed.
 
+## OpenCode Agent Workflow
+
+- Use `@developer` or the `developer` primary agent for development work in this repository.
+- Before pushing or asking someone else to merge changes, run a read-only review with `@code-reviewer` against the current git diff.
+- Address `@code-reviewer` findings, then rerun the smallest relevant validation before push or merge.
+- Do not commit, amend, push, create branches, or create pull requests unless explicitly instructed.
+
 ## Validation Expectations
 
 - Run the smallest relevant formatter, linter, typecheck, and tests for the files or app you changed.
