@@ -10,6 +10,18 @@ __pycache__/
 venv/
 htmlcov/
 
+# Logs
+logs/
+*.log
+*.pid
+*.seed
+*.stackdump
+
+# Environment files
+.env
+.env.*
+!.env.example
+
 # Node
 node_modules/
 dist/
@@ -25,7 +37,3 @@ build/
 .gradle/
 out/
 *.class
-
-# Backend runtime output
-logs/
-*.log
