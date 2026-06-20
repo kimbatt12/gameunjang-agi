@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.venv/
+venv/
+htmlcov/
+
+# Logs
+logs/
+*.log
+*.pid
+*.seed
+*.stackdump
+
+# Environment files
+.env
+.env.*
+!.env.example

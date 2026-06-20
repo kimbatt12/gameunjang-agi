@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        if: ${{ hashFiles('frontend/package.json') != '' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+
+      - name: Setup Python
+        if: ${{ hashFiles('backend/pyproject.toml') != '' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Validate frontend package
+        run: |
+          if [ -f frontend/package.json ]; then
+            npm ci --prefix frontend
+            for script in lint typecheck test build; do
+              if node -e "const pkg = require('./frontend/package.json'); process.exit(pkg.scripts && pkg.scripts[process.argv[1]] ? 0 : 1)" "$script"; then
+                npm run "$script" --prefix frontend
+              else
+                echo "skip: frontend package has no $script script"
+              fi
+            done
+          else
+            echo "skip: frontend/package.json does not exist"
+          fi
+
+      - name: Validate Python backend
+        working-directory: backend
+        run: |
+          if [ -f pyproject.toml ]; then
+            python -m pip install --upgrade pip
+            if ! python -m pip install -e ".[dev]"; then
+              echo "backend dev extra installation failed; installing project without extras"
+              python -m pip install -e .
+            fi
+            python -m pip install ruff pytest
+            ruff check .
+            ruff format --check .
+            pytest
+          else
+            echo "skip: backend/pyproject.toml does not exist; Python backend validation is not configured yet"
+          fi

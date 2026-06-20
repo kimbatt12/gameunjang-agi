@@ -1,0 +1,17 @@
+# Root environment files
+/.env
+/.env.*
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Generic caches
+.cache/
+.tmp/
+tmp/
+temp/
