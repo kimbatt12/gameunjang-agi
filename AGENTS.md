@@ -5,6 +5,7 @@
 - Work only inside `/home/hermes/projects/gameunjang-agi`.
 - Before major changes, verify `git rev-parse --show-toplevel` returns `/home/hermes/projects/gameunjang-agi`.
 - This repository currently has documentation plus placeholder `frontend/` and `backend/` boundaries.
+- Keep `backend/` and `frontend/` strictly separated, including non-code docs and ignore files. They should remain independently split-able into separate repositories without shared root runtime, package-manager, or tooling assumptions.
 - `frontend/` uses its own app tooling when present; `backend/` is a Python/FastAPI-compatible backend. Do not assume a root Node package or shared npm contract.
 - Do not add secrets or real credentials. Use placeholder environment variable names only in examples.
 
@@ -20,7 +21,7 @@
 
 - Use `@developer` or the `developer` primary agent for development work in this repository.
 - Address `@code-reviewer` findings, then rerun the smallest relevant validation before push or merge.
-- Do not commit, amend, push, create branches, or create pull requests unless explicitly instructed.
+- Do not commit, push, create branches, or create pull requests unless explicitly instructed.
 
 ## Git Hooks
 
