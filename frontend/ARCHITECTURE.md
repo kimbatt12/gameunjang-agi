@@ -18,6 +18,7 @@
 ## Stack
 
 - 런타임 기준: Node `24.x` when `package.json` exists.
+- 패키지 매니저 기준: `frontend/RUNTIME.md`가 소유하며, lockfile과 스크립트는 `frontend/` 안에만 둔다.
 - 앱 스택: Vite + React + TypeScript를 기본 계획으로 둔다.
 - 배포: 정적 빌드 결과를 Vercel 등 정적 호스팅에서 제공 가능하게 유지한다.
 

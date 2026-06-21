@@ -24,7 +24,7 @@
 7. 임의 웹 검색, 네이버/카카오/블로그/카페 결과는 MVP에서 제외한다.
 8. 날씨 API는 **기상청 API** 기준으로 설계한다.
 9. 사용량 제한은 일일 전체 제한이 아니라 **브라우저 세션당 10회 질문 제한**으로 한다.
-10. 개발 실행은 OpenCode가 수행한다. Hermes는 직접 코딩하지 않는다.
+10. 개발 실행은 OpenCode가 수행한다. Hermes는 기획과 검토에 집중한다.
 
 ---
 
@@ -69,6 +69,7 @@
 ## 4. 프로젝트 구조
 
 Vercel 단일 프로젝트로 배포하되, 소스 구조는 프론트엔드와 백엔드를 분리한다.
+Milestone 0의 실제 구조와 아래 목표 구조의 차이는 `docs/PROJECT_BASELINE.md`에서 확인한다. 앱별 런타임, 패키지 매니저, 환경변수 예시는 각 앱 디렉터리가 소유한다.
 
 ```text
 ~/projects/gameunjang-agi/
@@ -77,6 +78,7 @@ Vercel 단일 프로젝트로 배포하되, 소스 구조는 프론트엔드와 
     TRD.md
     IMPLEMENTATION_SPEC.md
   frontend/
+    .env.example
     src/
       components/
         ChatInput.tsx
@@ -96,6 +98,7 @@ Vercel 단일 프로젝트로 배포하되, 소스 구조는 프론트엔드와 
     vite.config.ts
     tsconfig.json
   backend/
+    .env.example
     app/
       __init__.py
       config.py
@@ -140,7 +143,6 @@ Vercel 단일 프로젝트로 배포하되, 소스 구조는 프론트엔드와 
   .github/
     workflows/
       refresh-data.yml
-  .env.example
   README.md
   vercel.json
 ```
@@ -155,26 +157,26 @@ Vercel 단일 프로젝트로 배포하되, 소스 구조는 프론트엔드와 
 
 ## 5. 환경변수
 
-`.env.example`에 아래 키를 정의한다. 실제 값은 커밋하지 않는다.
+`backend/.env.example`에 아래 키를 placeholder 예시값으로 정의한다. 실제 값은 로컬 `.env` 또는 배포 secret store에서 관리한다. 브라우저에 노출 가능한 프론트엔드 공개 설정은 `frontend/.env.example`에만 둔다.
 
 ```text
 # 한국관광공사 공공데이터 API
-TOUR_API_SERVICE_KEY=
+TOUR_API_SERVICE_KEY=replace-with-tour-api-service-key
 
 # LLM provider
 LLM_PROVIDER=upstage
 LLM_FALLBACK_PROVIDER=openrouter
 
 # Upstage
-UPSTAGE_API_KEY=
-UPSTAGE_MODEL=
+UPSTAGE_API_KEY=replace-with-upstage-api-key
+UPSTAGE_MODEL=replace-with-upstage-model-name
 
 # OpenRouter fallback
-OPENROUTER_API_KEY=
-OPENROUTER_MODEL=
+OPENROUTER_API_KEY=replace-with-openrouter-api-key
+OPENROUTER_MODEL=replace-with-openrouter-model-name
 
 # 기상청 API
-KMA_API_KEY=
+KMA_API_KEY=replace-with-kma-api-key
 
 # Runtime limits
 MAX_BROWSER_SESSION_QUESTIONS=10
@@ -209,7 +211,7 @@ LLMClient
 ## 6.3 호출 정책
 
 1. 먼저 규칙/키워드 기반 관광 관련성 판별을 수행한다.
-2. 명확히 비관광 질문이면 LLM을 호출하지 않는다.
+2. 명확히 비관광 질문이면 LLM 호출 없이 안내 응답을 반환한다.
 3. 관광 관련 질문이면 소형 모델을 호출한다.
 4. Upstage 호출 실패 시 OpenRouter fallback을 시도한다.
 5. fallback도 실패하면 API 결과 기반의 최소 템플릿 답변 또는 오류 안내를 반환한다.
@@ -289,7 +291,7 @@ POST /api/chat
 로그인이 없으므로 강한 서버 제한은 MVP 범위가 아니다. 다만 아래는 고려한다.
 
 - 요청 본문에 `clientSessionQuestionCount` 포함
-- 서버는 값이 비정상적으로 크거나 누락되어도 보안상 신뢰하지 않는다.
+- 서버는 값이 비정상적으로 크거나 누락된 경우에도 서버 기준 검증을 적용한다.
 - abuse 방지는 향후 기능으로 둔다.
 
 ---
@@ -299,7 +301,7 @@ POST /api/chat
 ## 9.1 전체 API 후보화
 
 - 한국관광공사 관련 공공데이터 API는 전부 메타데이터 후보로 수집한다.
-- 모든 API를 항상 호출하지 않는다.
+- 질문과 맞는 API 후보만 선별 호출한다.
 - 질문과 메타데이터 인덱스를 비교해 API 후보를 고른다.
 
 ## 9.2 MVP 우선 API 유형
@@ -378,7 +380,7 @@ POST /api/chat
 
 - 날씨 API는 기상청 API를 기준으로 한다.
 - 질문에 날짜/날씨/일정 조건이 있을 때 호출한다.
-- 모든 질문에 무조건 호출하지 않는다.
+- 날짜/날씨/일정 조건이 있는 질문에만 호출한다.
 
 ## 11.2 필요 기능
 
@@ -393,7 +395,7 @@ POST /api/chat
 
 - 관광 답변은 계속 생성한다.
 - 날씨 고려가 제한적이라는 warning을 포함한다.
-- 출처에 날씨 도메인을 넣지 않는다.
+- 출처는 관광 정보 공식/공공 도메인으로 유지한다.
 
 ---
 
@@ -401,9 +403,9 @@ POST /api/chat
 
 ## 12.1 원칙
 
-- MVP에서는 임의 웹 검색을 하지 않는다.
+- MVP 보완 조회는 한국관광공사 API 응답에 포함된 공식 링크 기준으로 수행한다.
 - 보완 조회는 한국관광공사 API 응답에 포함된 공식 링크로 제한한다.
-- 공식 링크가 없으면 보완 조회를 하지 않는다.
+- 공식 링크가 있는 경우에만 보완 조회를 수행한다.
 
 ## 12.2 허용 도메인
 
@@ -546,7 +548,7 @@ POST /api/chat
 비용: 확인된 정보 없음
 ```
 
-추측 금지.
+확인된 정보만 사용한다.
 
 ---
 
