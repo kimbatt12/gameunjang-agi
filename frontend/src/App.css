@@ -1,0 +1,38 @@
+.app-shell {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 2rem;
+}
+
+.hero {
+  width: min(100%, 42rem);
+  border: 1px solid #d8e0ef;
+  border-radius: 1.5rem;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 1.5rem 4rem rgba(15, 23, 42, 0.12);
+  padding: clamp(1.5rem, 5vw, 3rem);
+}
+
+.eyebrow {
+  color: #2563eb;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin: 0 0 0.75rem;
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  color: #0f172a;
+  font-size: clamp(2rem, 10vw, 4rem);
+  line-height: 1;
+  margin: 0 0 1rem;
+}
+
+.hero p:last-child {
+  color: #475569;
+  font-size: 1rem;
+  line-height: 1.7;
+  margin: 0;
+}
