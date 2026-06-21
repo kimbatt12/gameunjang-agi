@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <rect width="1280" height="720" fill="#0b1020"/>
+  <rect x="56" y="56" width="1168" height="608" rx="28" fill="#111827" stroke="#334155" stroke-width="2"/>
+  <text x="96" y="120" fill="#e5e7eb" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="34" font-weight="700">Gameunjang-agi Milestone 1 Validation</text>
+  <text x="96" y="174" fill="#93c5fd" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="22">PR #5 · feat/milestone-1-development-tooling · commit 24d6e1c</text>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="26" fill="#d1fae5">
+    <text x="96" y="250">✓ Frontend Node 24.17.0 / npm 11.17.0</text>
+    <text x="136" y="292">npm ci · lint · typecheck · build: PASS</text>
+    <text x="96" y="360">✓ Backend Python 3.14.6</text>
+    <text x="136" y="402">uv sync · ruff check · ruff format --check · pytest: PASS (1 passed)</text>
+    <text x="96" y="470">✓ CI-style backend dev install</text>
+    <text x="136" y="512">pip install -e '.[dev]' · ruff check · pytest: PASS</text>
+    <text x="96" y="580">✓ Repository gates</text>
+    <text x="136" y="622">git diff --check · pre-push hook · OpenCode code-reviewer: PASS</text>
+  </g>
+</svg>
