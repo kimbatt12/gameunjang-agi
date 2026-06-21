@@ -18,6 +18,7 @@
 ## Stack
 
 - 런타임 기준: Python `>=3.14,<3.15` when `pyproject.toml` exists.
+- 패키지 매니저 기준: `backend/RUNTIME.md`가 소유하며, lockfile과 검증 설정은 `backend/` 안에만 둔다.
 - 앱 구조: FastAPI-compatible ASGI app 또는 동일한 service 함수 중심 구조.
 - 배포: Vercel Python Functions, ASGI 서버, Docker 기반 호스팅으로 이전 가능하게 유지한다.
 - 데이터: 초기 MVP는 정적 JSON 인덱스와 파일/메모리 캐시를 우선한다.
