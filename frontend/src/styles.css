@@ -19,3 +19,12 @@ body {
   min-width: 320px;
   min-height: 100vh;
 }
+
+button,
+textarea {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}

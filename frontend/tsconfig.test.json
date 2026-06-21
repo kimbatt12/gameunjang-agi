@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": false,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmit": false,
+    "outDir": "dist-test",
+    "rootDir": "src",
+    "types": ["node"]
+  },
+  "include": ["src/**/*.test.ts", "src/lib/**/*.ts"],
+  "exclude": []
+}
