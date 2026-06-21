@@ -18,12 +18,12 @@
 
 ## 1. 앱 골격 및 로컬 개발 기준
 
-- [ ] `frontend/`에 Node 24.x 기준 Vite + React + TypeScript 앱을 만든다.
-- [ ] `backend/`에 Python 3.14 기준 FastAPI 호환 구조를 만든다.
-- [ ] Vercel 전용 엔트리포인트는 얇은 배포 어댑터로 분리한다.
-- [ ] 프론트엔드/백엔드 각각의 검증 명령을 해당 디렉터리 안에 둔다.
-- [ ] 스캐폴딩 검증: 각 앱 디렉터리에서 install·lint/typecheck 또는 backend ruff/pytest 기본 명령이 실행된다.
-- [ ] 스캐폴딩 검증: 앱별 런타임 의존성은 각 앱 디렉터리에 있다.
+- [x] `frontend/`에 Node 24.x 기준 Vite + React + TypeScript 앱을 만든다.
+- [x] `backend/`에 Python 3.14 기준 FastAPI 호환 구조를 만든다.
+- [x] Vercel 전용 엔트리포인트는 얇은 배포 어댑터로 분리한다.
+- [x] 프론트엔드/백엔드 각각의 검증 명령을 해당 디렉터리 안에 둔다.
+- [x] 스캐폴딩 검증: 각 앱 디렉터리에서 install·lint/typecheck 또는 backend ruff/pytest 기본 명령이 실행된다.
+- [x] 스캐폴딩 검증: 앱별 런타임 의존성은 각 앱 디렉터리에 있다.
 
 ## 2. 프론트엔드 MVP
 
