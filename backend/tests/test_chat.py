@@ -24,10 +24,13 @@ def test_chat_accepts_domestic_tourism_question() -> None:
     assert payload["answer"]
     assert payload["items"] == []
     assert payload["sourceDomains"] == ["visitkorea.or.kr"]
-    assert payload["warnings"] == [
-        "external_provider_not_configured",
-        "tour_api_candidates_selected",
-    ]
+    assert (
+        "확인된 API 항목 데이터가 없어 추천 항목을 제공하지 않습니다"
+        in payload["answer"]
+    )
+    assert "api_data_first_answer" not in payload["warnings"]
+    assert "confirmed_api_item_data_unavailable" in payload["warnings"]
+    assert "weather_api_not_called_using_question_condition" in payload["warnings"]
 
 
 def test_chat_rejects_non_tourism_question_without_sources() -> None:

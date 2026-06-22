@@ -1,3 +1,4 @@
+from app.answer_generation import compose_answer
 from app.guard import is_domestic_tourism_question
 from app.routing import CandidateSelection, select_api_candidates
 from app.schemas import ChatResponse
@@ -25,22 +26,7 @@ def build_chat_response(message: str) -> ChatResponse:
     if selection.is_low_relevance:
         return _build_insufficient_information_response(selection)
 
-    candidate_names = ", ".join(
-        candidate.api.name for candidate in selection.candidates
-    )
-
-    return ChatResponse(
-        type="answer",
-        isTourismRelated=True,
-        answer=(
-            "국내 관광 질문으로 확인되어 한국관광공사 API 후보를 선택했습니다. "
-            f"우선 후보: {candidate_names}. "
-            "현재 단계에서는 외부 API나 LLM을 호출하지 않고 후보 라우팅만 수행합니다."
-        ),
-        items=[],
-        sourceDomains=_source_domains(selection),
-        warnings=["external_provider_not_configured", "tour_api_candidates_selected"],
-    )
+    return compose_answer(message=message, selection=selection)
 
 
 def _build_insufficient_information_response(
@@ -67,7 +53,3 @@ def _build_insufficient_information_response(
         sourceDomains=[],
         warnings=[selection.reason, "no_external_call_due_to_insufficient_information"],
     )
-
-
-def _source_domains(selection: CandidateSelection) -> list[str]:
-    return sorted({candidate.api.sourceDomain for candidate in selection.candidates})
