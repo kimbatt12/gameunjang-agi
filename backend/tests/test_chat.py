@@ -23,8 +23,11 @@ def test_chat_accepts_domestic_tourism_question() -> None:
     assert payload["isTourismRelated"] is True
     assert payload["answer"]
     assert payload["items"] == []
-    assert payload["sourceDomains"] == ["data.go.kr", "visitkorea.or.kr"]
-    assert payload["warnings"] == ["external_provider_not_configured"]
+    assert payload["sourceDomains"] == ["visitkorea.or.kr"]
+    assert payload["warnings"] == [
+        "external_provider_not_configured",
+        "tour_api_candidates_selected",
+    ]
 
 
 def test_chat_rejects_non_tourism_question_without_sources() -> None:
@@ -108,3 +111,21 @@ def test_chat_response_schema_includes_consistent_fields() -> None:
     assert isinstance(payload["items"], list)
     assert isinstance(payload["sourceDomains"], list)
     assert isinstance(payload["warnings"], list)
+
+
+def test_chat_asks_for_more_info_when_region_is_missing() -> None:
+    client = TestClient(create_app())
+
+    response = client.post("/api/chat", json={"message": "국내 축제 알려줘"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["type"] == "answer"
+    assert payload["isTourismRelated"] is True
+    assert "국내 지역명" in payload["answer"]
+    assert payload["items"] == []
+    assert payload["sourceDomains"] == []
+    assert payload["warnings"] == [
+        "insufficient_region_or_category_signal",
+        "no_external_call_due_to_insufficient_information",
+    ]
