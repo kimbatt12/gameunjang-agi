@@ -90,14 +90,14 @@
 
 ## 8. 통합, 비용, 배포 준비
 
-- [ ] 프론트엔드 lint/typecheck/test/build 스크립트를 실행 가능하게 한다.
-- [ ] 백엔드 `ruff check .`, `ruff format --check .`, `pytest`를 실행 가능하게 한다.
-- [ ] 관광 질문, 비관광 범위 안내, 세션 제한, 출처 정책 테스트를 추가한다.
-- [ ] LLM 호출 횟수, 캐시 hit rate, 일 1,000쿼리 기준 비용을 점검한다.
-- [ ] Vercel 무료 티어와 Python Function 제한을 확인한다.
-- [ ] 배포 환경변수를 문서화하고 실제 비밀값은 로컬/배포 환경에서만 관리한다.
-- [ ] 통합 검증: 프론트엔드에서 `/api/chat`까지 happy path와 오류 path가 통과한다.
-- [ ] 배포 검증: preview 배포 smoke, 환경변수 체크, function 로그 확인을 완료한다.
+- [x] 프론트엔드 lint/typecheck/test/build 스크립트를 실행 가능하게 한다.
+- [x] 백엔드 `ruff check .`, `ruff format --check .`, `pytest`를 실행 가능하게 한다.
+- [x] 관광 질문, 비관광 범위 안내, 세션 제한, 출처 정책 테스트를 추가한다.
+- [x] LLM 호출 횟수, 캐시 hit rate, 일 1,000쿼리 기준 비용을 점검한다.
+- [x] Vercel 무료 티어와 Python Function 제한을 확인한다.
+- [x] 배포 환경변수를 문서화하고 실제 비밀값은 로컬/배포 환경에서만 관리한다.
+- [x] 통합 검증: 프론트엔드에서 `/api/chat`까지 happy path와 오류 path가 통과한다.
+- [x] 배포 검증: preview 배포 smoke, 환경변수 체크, function 로그 확인을 완료한다.
 
 ## 9. MVP 완료 기준
 
