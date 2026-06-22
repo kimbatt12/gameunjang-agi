@@ -54,6 +54,19 @@ def test_chat_rejects_non_tourism_question_without_sources() -> None:
     assert payload["warnings"] == ["out_of_scope_no_external_call"]
 
 
+def test_non_tourism_scope_guidance_skips_external_source_policy() -> None:
+    client = TestClient(create_app())
+
+    response = client.post("/api/chat", json={"message": "회사 보고서 요약해줘"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["type"] == "rejection"
+    assert "여행지, 관광지, 축제, 숙소, 음식점, 여행코스" in payload["answer"]
+    assert payload["sourceDomains"] == []
+    assert payload["warnings"] == ["out_of_scope_no_external_call"]
+
+
 def test_chat_rejects_message_over_configured_length(monkeypatch) -> None:
     monkeypatch.setenv("MAX_USER_MESSAGE_CHARS", "5")
     get_settings.cache_clear()
@@ -132,3 +145,16 @@ def test_chat_asks_for_more_info_when_region_is_missing() -> None:
         "insufficient_region_or_category_signal",
         "no_external_call_due_to_insufficient_information",
     ]
+
+
+def test_chat_tourism_source_policy_uses_allowed_api_candidate_domain() -> None:
+    client = TestClient(create_app())
+
+    response = client.post("/api/chat", json={"message": "서울 축제 알려줘"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["isTourismRelated"] is True
+    assert set(payload["sourceDomains"]).issubset({"data.go.kr", "visitkorea.or.kr"})
+    assert "선택된 API 후보 도메인:" in payload["answer"]
+    assert "confirmed_api_item_data_unavailable" in payload["warnings"]

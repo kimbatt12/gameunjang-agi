@@ -38,6 +38,35 @@ describe('sendChatMessage', () => {
     assert.deepEqual(response, validResponse);
   });
 
+  it('posts /api/chat happy path requests with the expected JSON contract', async () => {
+    const calls: Array<{ input: string | URL | Request; init?: RequestInit }> = [];
+    const fetcher: typeof fetch = async (input, init) => {
+      calls.push({ input, init });
+      return jsonResponse(validResponse, 200);
+    };
+
+    const response = await sendChatMessage(request, fetcher);
+
+    assert.deepEqual(response, validResponse);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].input, '/api/chat');
+    assert.equal(calls[0].init?.method, 'POST');
+    assert.deepEqual(calls[0].init?.headers, { 'Content-Type': 'application/json' });
+    assert.deepEqual(JSON.parse(String(calls[0].init?.body)), request);
+  });
+
+  it('raises a typed error for /api/chat error responses', async () => {
+    const fetcher: typeof fetch = async () => jsonResponse({ detail: 'backend failed' }, 503);
+
+    await assert.rejects(
+      sendChatMessage(request, fetcher),
+      (error: unknown) =>
+        error instanceof ChatApiError &&
+        error.status === 503 &&
+        error.message === '답변을 가져오지 못했습니다. 잠시 후 다시 시도해 주세요. (503)',
+    );
+  });
+
   it('rejects malformed nested API item payloads', async () => {
     const malformedResponse = {
       ...validResponse,
@@ -66,11 +95,14 @@ describe('sendChatMessage', () => {
 });
 
 function createJsonFetcher(payload: unknown): typeof fetch {
-  return async () =>
-    new Response(JSON.stringify(payload), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+  return async () => jsonResponse(payload, 200);
+}
+
+function jsonResponse(payload: unknown, status: number): Response {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
 }
