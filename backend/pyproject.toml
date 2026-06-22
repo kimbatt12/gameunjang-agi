@@ -28,8 +28,8 @@ dev = [
 line-length = 88
 target-version = "py314"
 
-[tool.setuptools]
-packages = ["api", "app"]
+[tool.setuptools.packages.find]
+include = ["api", "app", "app.*"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
