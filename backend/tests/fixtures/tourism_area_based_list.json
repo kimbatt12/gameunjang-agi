@@ -1,0 +1,23 @@
+{
+  "response": {
+    "body": {
+      "items": {
+        "item": [
+          {
+            "contentid": "12345",
+            "title": "부산시립미술관",
+            "addr1": "부산 해운대구 APEC로 58",
+            "addr2": "(우동)",
+            "homepage": "<a href=\"https://art.busan.go.kr\">공식 홈페이지</a>"
+          },
+          {
+            "contentid": "67890",
+            "title": "공식 링크 없는 명소",
+            "addr1": "부산 중구 중앙대로",
+            "tel": "051-000-0000"
+          }
+        ]
+      }
+    }
+  }
+}

@@ -103,13 +103,13 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "pydantic" },
     { name = "starlette" },
 ]
 
 [package.optional-dependencies]
 dev = [
-    { name = "httpx" },
     { name = "jsonschema", extra = ["format"] },
     { name = "pytest" },
     { name = "ruff" },
@@ -117,7 +117,6 @@ dev = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "httpx" },
     { name = "jsonschema", extra = ["format"] },
     { name = "pytest" },
     { name = "ruff" },
@@ -126,7 +125,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.116,<1.0" },
-    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.28,<1.0" },
+    { name = "httpx", specifier = ">=0.28,<1.0" },
     { name = "jsonschema", extras = ["format"], marker = "extra == 'dev'", specifier = ">=4.25,<5.0" },
     { name = "pydantic", specifier = ">=2.11,<3.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.4,<9.0" },
@@ -137,7 +136,6 @@ provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "httpx", specifier = ">=0.28,<1.0" },
     { name = "jsonschema", extras = ["format"], specifier = ">=4.25,<5.0" },
     { name = "pytest", specifier = ">=8.4,<9.0" },
     { name = "ruff", specifier = ">=0.12,<1.0" },
