@@ -1,4 +1,5 @@
 from app.guard import is_domestic_tourism_question
+from app.routing import CandidateSelection, select_api_candidates
 from app.schemas import ChatResponse
 
 SCOPE_GUIDANCE = (
@@ -20,15 +21,53 @@ def build_chat_response(message: str) -> ChatResponse:
             warnings=["out_of_scope_no_external_call"],
         )
 
+    selection = select_api_candidates(message)
+    if selection.is_low_relevance:
+        return _build_insufficient_information_response(selection)
+
+    candidate_names = ", ".join(
+        candidate.api.name for candidate in selection.candidates
+    )
+
     return ChatResponse(
         type="answer",
         isTourismRelated=True,
         answer=(
-            "국내 관광 관련 질문으로 확인되었습니다. "
-            "현재 단계에서는 외부 API나 LLM을 호출하지 않고, "
-            "후속 마일스톤에서 한국관광공사 공공데이터 기반 추천을 연결할 예정입니다."
+            "국내 관광 질문으로 확인되어 한국관광공사 API 후보를 선택했습니다. "
+            f"우선 후보: {candidate_names}. "
+            "현재 단계에서는 외부 API나 LLM을 호출하지 않고 후보 라우팅만 수행합니다."
         ),
         items=[],
-        sourceDomains=["data.go.kr", "visitkorea.or.kr"],
-        warnings=["external_provider_not_configured"],
+        sourceDomains=_source_domains(selection),
+        warnings=["external_provider_not_configured", "tour_api_candidates_selected"],
     )
+
+
+def _build_insufficient_information_response(
+    selection: CandidateSelection,
+) -> ChatResponse:
+    detail = (
+        "지역명과 관광 유형(예: 관광지, 축제, 숙소, 맛집, 코스)을 함께 알려 주세요."
+    )
+    if selection.matched_regions and not selection.matched_categories:
+        detail = "관광 유형(예: 관광지, 축제, 숙소, 맛집, 코스)을 함께 알려 주세요."
+    elif selection.matched_categories and not selection.matched_regions:
+        detail = "국내 지역명(예: 서울, 부산, 강릉, 제주)을 함께 알려 주세요."
+
+    answer = (
+        "질문이 국내 관광 범위에는 해당하지만 API 후보를 고르기에는 "
+        f"정보가 부족합니다. {detail}"
+    )
+
+    return ChatResponse(
+        type="answer",
+        isTourismRelated=True,
+        answer=answer,
+        items=[],
+        sourceDomains=[],
+        warnings=[selection.reason, "no_external_call_due_to_insufficient_information"],
+    )
+
+
+def _source_domains(selection: CandidateSelection) -> list[str]:
+    return sorted({candidate.api.sourceDomain for candidate in selection.candidates})

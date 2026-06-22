@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gameunjang-agi.local/schemas/tour_api_metadata.schema.json",
+  "title": "Korea Tourism Organization API Metadata Index",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "generatedAt", "apis"],
+  "properties": {
+    "schemaVersion": {"type": "string", "pattern": "^1\\.0\\.0$"},
+    "generatedAt": {"type": "string", "format": "date-time"},
+    "apis": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/apiMetadata"}
+    }
+  },
+  "$defs": {
+    "apiMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "description",
+        "endpoint",
+        "method",
+        "requiredParams",
+        "optionalParams",
+        "responseFields",
+        "categories",
+        "regions",
+        "synonyms",
+        "examples",
+        "sourceDomain",
+        "lastCheckedAt",
+        "searchText",
+        "priority"
+      ],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+        "name": {"type": "string", "minLength": 1},
+        "description": {"type": "string", "minLength": 1},
+        "endpoint": {"type": "string", "minLength": 1},
+        "method": {"type": "string", "enum": ["GET"]},
+        "requiredParams": {"type": "array", "items": {"type": "string"}},
+        "optionalParams": {"type": "array", "items": {"type": "string"}},
+        "responseFields": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "categories": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "regions": {"type": "array", "items": {"type": "string"}},
+        "synonyms": {"type": "array", "items": {"type": "string"}},
+        "examples": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "sourceDomain": {"type": "string", "enum": ["data.go.kr", "visitkorea.or.kr"]},
+        "lastCheckedAt": {"type": "string", "format": "date"},
+        "searchText": {"type": "string", "minLength": 1},
+        "priority": {"type": "integer", "minimum": 1}
+      }
+    }
+  }
+}

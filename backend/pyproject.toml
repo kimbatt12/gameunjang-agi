@@ -13,6 +13,7 @@ dependencies = [
 [dependency-groups]
 dev = [
   "httpx>=0.28,<1.0",
+  "jsonschema[format]>=4.25,<5.0",
   "pytest>=8.4,<9.0",
   "ruff>=0.12,<1.0",
 ]
@@ -20,6 +21,7 @@ dev = [
 [project.optional-dependencies]
 dev = [
   "httpx>=0.28,<1.0",
+  "jsonschema[format]>=4.25,<5.0",
   "pytest>=8.4,<9.0",
   "ruff>=0.12,<1.0",
 ]
@@ -30,6 +32,9 @@ target-version = "py314"
 
 [tool.setuptools.packages.find]
 include = ["api", "app", "app.*"]
+
+[tool.setuptools.package-data]
+"app.routing" = ["data/current/*.json", "data/schemas/*.json"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
