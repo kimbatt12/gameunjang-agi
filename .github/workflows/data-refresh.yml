@@ -1,0 +1,52 @@
+name: Data refresh
+
+on:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install backend dependencies
+        run: python -m pip install -e "backend[dev]"
+
+      - name: Generate staging snapshot
+        run: python backend/tools/data_refresh.py generate-staging
+
+      - name: Validate staging snapshot
+        run: python backend/tools/data_refresh.py validate-staging
+
+      - name: Smoke test staging snapshot
+        run: python backend/tools/data_refresh.py smoke-staging
+
+      - name: Replace current snapshot
+        run: python backend/tools/data_refresh.py promote
+
+      - name: Validate current snapshot
+        run: python backend/tools/data_refresh.py validate-current
+
+      - name: Smoke test current snapshot
+        run: python backend/tools/data_refresh.py smoke-current
+
+      - name: Upload refresh artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: data-refresh-${{ github.run_id }}
+          path: |
+            data/current/
+            data/staging/
+            data/artifacts/
+          if-no-files-found: error

@@ -80,13 +80,13 @@
 
 ## 7. 데이터 갱신 자동화
 
-- [ ] GitHub Actions 주 1회 cron 갱신을 추가한다.
-- [ ] `workflow_dispatch` 수동 갱신을 추가한다.
-- [ ] `data/staging/` 생성 후 검증 성공 시에만 `data/current/`를 교체한다.
-- [ ] 갱신 실패 시 기존 정상 데이터를 유지한다.
-- [ ] 데이터 스냅샷 검증과 smoke test를 자동화한다.
-- [ ] 데이터 갱신 검증: staging schema·row count·핵심 샘플 smoke가 통과한다.
-- [ ] 데이터 갱신 검증: 성공 run은 current 교체 로그와 산출물을 남긴다.
+- [x] GitHub Actions 주 1회 cron 갱신을 추가한다.
+- [x] `workflow_dispatch` 수동 갱신을 추가한다.
+- [x] `data/staging/` 생성 후 검증 성공 시에만 `data/current/`를 교체한다.
+- [x] 갱신 실패 시 기존 정상 데이터를 유지한다.
+- [x] 데이터 스냅샷 검증과 smoke test를 자동화한다.
+- [x] 데이터 갱신 검증: staging schema·row count·핵심 샘플 smoke가 통과한다.
+- [x] 데이터 갱신 검증: 성공 run은 current 교체 로그와 산출물을 남긴다.
 
 ## 8. 통합, 비용, 배포 준비
 
