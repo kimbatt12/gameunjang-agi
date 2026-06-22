@@ -1,0 +1,22 @@
+{
+  "response": {
+    "body": {
+      "items": {
+        "item": [
+          {
+            "category": "TMP",
+            "fcstValue": "22",
+            "fcstDate": "20260622",
+            "fcstTime": "1500"
+          },
+          {
+            "category": "SKY",
+            "fcstValue": "3",
+            "fcstDate": "20260622",
+            "fcstTime": "1500"
+          }
+        ]
+      }
+    }
+  }
+}

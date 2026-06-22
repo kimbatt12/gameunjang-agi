@@ -58,14 +58,14 @@
 
 ## 5. 외부 Provider 연동
 
-- [ ] LLM provider adapter 인터페이스를 만든다.
-- [ ] Upstage 기본 provider를 구현한다.
-- [ ] OpenRouter fallback provider를 구현한다.
-- [ ] 한국관광공사 API client와 응답 정규화를 구현한다.
-- [ ] 기상청 API client와 실패 시 graceful degradation을 구현한다.
-- [ ] API 응답에 포함된 공식 링크만 보완 조회하도록 제한한다.
-- [ ] 연동 검증: provider mock 테스트로 성공·fallback·timeout 흐름을 확인한다.
-- [ ] 연동 검증: 관광공사·기상청 응답 fixture가 정규화 스키마와 맞다.
+- [x] LLM provider adapter 인터페이스를 만든다.
+- [x] Upstage 기본 provider를 구현한다.
+- [x] OpenRouter fallback provider를 구현한다.
+- [x] 한국관광공사 API client와 응답 정규화를 구현한다.
+- [x] 기상청 API client와 실패 시 graceful degradation을 구현한다.
+- [x] API 응답에 포함된 공식 링크만 보완 조회하도록 제한한다.
+- [x] 연동 검증: provider mock 테스트로 성공·fallback·timeout 흐름을 확인한다.
+- [x] 연동 검증: 관광공사·기상청 응답 fixture가 정규화 스키마와 맞다.
 
 ## 6. 답변 생성과 출처 정책
 
