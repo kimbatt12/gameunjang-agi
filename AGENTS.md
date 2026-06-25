@@ -5,7 +5,7 @@
 - Work only inside `/home/hermes/projects/gameunjang-agi`.
 - Before major changes, verify `git rev-parse --show-toplevel` returns `/home/hermes/projects/gameunjang-agi`.
 - This repository currently has documentation plus placeholder `frontend/` and `backend/` boundaries.
-- Keep `backend/` and `frontend/` strictly separated, including non-code docs and ignore files. They should remain independently split-able into separate repositories without shared root runtime, package-manager, or tooling assumptions.
+- Keep `backend/` and `frontend/` strictly separated, including non-code docs and ignore files. They should remain independently split-able into separate repositories without shared root runtime, package-manager, or tooling assumptions. Exception: this repository deploys as one Vercel project from the repo root, so only `vercel.json`, `api/index.py`, and `requirements.txt` may live at the root boundary for Vercel routing and Python Function runtime dependencies.
 - `frontend/` uses its own app tooling when present; `backend/` is a Python/FastAPI-compatible backend. Do not assume a root Node package or shared npm contract.
 - Do not add secrets or real credentials. Use placeholder environment variable names only in examples.
 

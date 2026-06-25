@@ -1,0 +1,6 @@
+# Vercel-only Python Function dependencies for api/index.py.
+# Backend development dependencies remain defined in backend/pyproject.toml.
+fastapi>=0.116,<1.0
+httpx>=0.28,<1.0
+pydantic>=2.11,<3.0
+starlette>=0.46,<1.0
