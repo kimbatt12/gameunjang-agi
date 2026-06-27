@@ -15,7 +15,7 @@ class TourApiMetadata(BaseModel):
     id: str = Field(pattern=r"^[a-z][a-z0-9_]*$")
     name: str
     description: str
-    endpoint: str
+    endpoint: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9]*$")
     method: Literal["GET"]
     requiredParams: list[str]
     optionalParams: list[str]
