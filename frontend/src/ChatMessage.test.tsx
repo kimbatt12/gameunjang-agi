@@ -25,4 +25,26 @@ describe('ChatMessage', () => {
     assert.match(html, /출처: /);
     assert.match(html, /visitkorea\.or\.kr, mcst\.go\.kr/);
   });
+
+  it('does not render a visible warnings or debug section', () => {
+    const message: ConversationMessage = {
+      id: 'assistant-1',
+      role: 'assistant',
+      createdAt: '2026-06-22T00:00:00.000Z',
+      response: {
+        type: 'answer',
+        isTourismRelated: true,
+        answer: '공식 데이터 기반 추천입니다.',
+        sourceDomains: [],
+        warnings: ['api_data_first_answer', 'llm_scope_recheck_accepted'],
+      },
+    };
+
+    const html = renderToStaticMarkup(<ChatMessage message={message} />);
+
+    assert.doesNotMatch(html, /aria-label="경고"/);
+    assert.doesNotMatch(html, /안내/);
+    assert.doesNotMatch(html, /api_data_first_answer/);
+    assert.doesNotMatch(html, /llm_scope_recheck_accepted/);
+  });
 });

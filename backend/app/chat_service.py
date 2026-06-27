@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime
 from typing import Protocol
 
@@ -52,6 +53,8 @@ REGION_WEATHER_GRIDS: dict[str, tuple[int, int]] = {
     "속초": (87, 141),
 }
 
+logger = logging.getLogger(__name__)
+
 
 class TourismClient(Protocol):
     def get(self, endpoint: str, params: dict[str, str | int]) -> dict[str, object]:
@@ -64,6 +67,22 @@ class WeatherClient(Protocol):
 
 
 def build_chat_response(
+    message: str,
+    *,
+    tourism_client: TourismClient | None = None,
+    weather_client: WeatherClient | None = None,
+    llm_provider: LLMProvider | None = None,
+) -> ChatResponse:
+    response = _build_chat_response_with_internal_warnings(
+        message,
+        tourism_client=tourism_client,
+        weather_client=weather_client,
+        llm_provider=llm_provider,
+    )
+    return _finalize_chat_response(response)
+
+
+def _build_chat_response_with_internal_warnings(
     message: str,
     *,
     tourism_client: TourismClient | None = None,
@@ -132,6 +151,19 @@ def build_chat_response(
         api_items=api_items,
         llm_provider=llm,
     )
+
+
+def _finalize_chat_response(response: ChatResponse) -> ChatResponse:
+    internal_warnings = list(response.warnings)
+    logger.info(
+        "chat response produced",
+        extra={
+            "response_type": response.type,
+            "warnings": internal_warnings,
+            "warning_count": len(internal_warnings),
+        },
+    )
+    return response.model_copy(update={"warnings": []})
 
 
 def _build_out_of_scope_response(*, warnings: list[str]) -> ChatResponse:
