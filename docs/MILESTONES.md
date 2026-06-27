@@ -64,9 +64,9 @@
 - [x] 한국관광공사 API client와 응답 정규화를 구현한다.
 - [x] 기상청 API client와 실패 시 graceful degradation을 구현한다.
 - [x] API 응답에 포함된 공식 링크만 보완 조회하도록 제한한다.
-- [ ] `/api/chat` 관광 답변 경로에서 한국관광공사 API를 실제 호출한다. 로컬/테스트 배선은 있으나 실제 배포 런타임 검증 전까지 완료로 보지 않는다.
-- [ ] `/api/chat`이 한국관광공사 실응답 항목을 정규화해 답변 생성 입력으로 전달한다. mock/regression 검증은 통과하나 live runtime 검증은 남아 있다.
-- [ ] `/api/chat` 관광 답변 경로에서 설계대로 LLM/provider를 호출한다. provider mock/regression 검증은 있으나 실제 배포 런타임 검증 전까지 완료로 보지 않는다.
+- [x] `/api/chat` 관광 답변 경로에서 한국관광공사 API를 실제 호출한다. Vercel Preview에서 `강릉 2박 3일 코스` 요청이 200으로 응답하고 실제 TourAPI 항목을 반환함을 확인했다.
+- [x] `/api/chat`이 한국관광공사 실응답 항목을 정규화해 답변 생성 입력으로 전달한다. Vercel Preview 응답에서 실제 TourAPI 항목, `api_data_first_answer`, `llm_composed_answer` 경고와 함께 `confirmed_api_item_data_unavailable` 미포함을 확인했다.
+- [x] `/api/chat` 관광 답변 경로에서 설계대로 LLM/provider를 호출한다. Vercel Preview 응답에서 `llm_composed_answer` 경고를 확인했다.
 - [x] `/api/chat` 관광 답변 경로의 TourAPI+LLM mock/regression 배선 테스트를 갖춘다.
 - [ ] `/api/chat` 날씨 조건 질문에서 기상청 API를 실제 호출하고 실패 시 graceful degradation을 적용한다. Vercel에는 `TOUR_API_SERVICE_KEY`와 `UPSTAGE_*`가 있으나 `KMA_API_KEY`가 없어 live runtime 통합/검증은 차단됨.
 - [x] 연동 검증: provider mock 테스트로 성공·fallback·timeout 흐름을 확인한다.
@@ -105,7 +105,7 @@
 - [x] Vercel 무료 티어와 Python Function 제한을 확인한다.
 - [x] 배포 환경변수를 문서화하고 실제 비밀값은 로컬/배포 환경에서만 관리한다.
 - [x] 통합 검증: 프론트엔드에서 `/api/chat`까지 happy path와 오류 path가 통과한다.
-- [ ] 통합 검증: `/api/chat` 대표 관광 질문이 한국관광공사 API 호출, 실항목 정규화, `compose_answer`, LLM/provider 호출까지 통과한다.
+- [x] 통합 검증: `/api/chat` 대표 관광 질문이 한국관광공사 API 호출, 실항목 정규화, `compose_answer`, LLM/provider 호출까지 통과한다. Vercel Preview에서 `강릉 2박 3일 코스` 요청으로 확인했다.
 - [ ] 통합 검증: 날씨 조건 질문이 기상청 API 호출과 날씨 반영 답변까지 통과한다.
 - [x] 회귀 검증: 현재 gap처럼 `강릉 2박 3일 코스`가 답변 가능 데이터가 있는데도 `confirmed_api_item_data_unavailable`로 끝나면 실패한다.
 - [x] 배포 검증: preview 배포 smoke, 환경변수 체크, function 로그 확인을 완료한다.
@@ -113,10 +113,10 @@
 ## 9. MVP 완료 기준
 
 - [ ] 모바일에서 국내 관광 질문을 입력하면 `/api/chat`이 실제 관광공사 데이터와 LLM/provider 경로를 거쳐 답변한다.
-- [ ] 질문에 맞는 한국관광공사 API 후보를 선택하고 실제 호출해 정규화된 항목을 답변에 사용한다.
+- [x] 질문에 맞는 한국관광공사 API 후보를 선택하고 실제 호출해 정규화된 항목을 답변에 사용한다.
 - [x] 비관광 질문에 정중한 범위 안내를 제공한다.
 - [ ] 일정/날씨 조건 질문에 대해 관광공사·기상청 실데이터를 사용해 제한된 범위에서 답변한다.
-- [ ] 답변에 실제 사용한 공식 출처 도메인이 표시된다.
+- [x] 답변에 실제 사용한 공식 출처 도메인이 표시된다.
 - [x] 주 1회/수동 데이터 갱신이 성공 시에만 반영된다.
 - [x] 월 1달러 미만 목표를 지키는 비용 통제 장치가 있다.
 - [ ] 완료 검증: 문서·스캐폴딩·백엔드·프론트엔드·런타임 통합·데이터 갱신·배포 게이트가 모두 녹색이다.
