@@ -514,15 +514,15 @@ def test_question_condition_with_clear_kma_forecast_uses_distinct_summary() -> N
     assert "기상청 단기예보 기준 악천후 가능성 반영" not in response.answer
 
 
-def test_insufficient_information_case_keeps_no_sources_or_items() -> None:
+def test_default_region_case_keeps_no_items_and_public_warnings_empty() -> None:
     from app.chat_service import build_chat_response
 
     response = build_chat_response("국내 축제 알려줘")
 
     assert response.items == []
-    assert response.sourceDomains == []
+    assert set(response.sourceDomains).issubset({"data.go.kr", "visitkorea.or.kr"})
     assert response.warnings == []
-    assert "국내 지역명" in response.answer
+    assert "국내 지역명" not in response.answer
 
 
 def test_empty_api_items_do_not_create_recommendations_or_official_claims() -> None:

@@ -8,7 +8,7 @@
 
 - 모바일 국내 관광 질문: `frontend/index.html`의 모바일 viewport와 모바일 우선 챗 UI, `backend/tests/test_mvp_completion_gate.py`의 `/api/chat` 관광 질문 smoke로 확인한다.
 - API 후보 선택: `backend/tests/test_api_routing.py`와 완료 게이트 테스트가 한국관광공사 API 후보를 질문 신호에 맞게 선택하는지 확인한다.
-- 비관광 범위 안내: `/api/chat`이 `out_of_scope_no_external_call`로 종료하고 출처·외부 호출 근거를 비워 둔다.
+- 비관광 범위 안내: `/api/chat`이 LLM scope classifier의 `out_of_scope` 판별 후 Tourism/KMA API 호출 없이 종료하고 출처·외부 호출 근거와 public warning을 비워 둔다.
 - 일정/날씨 제한 답변: 일정 형식, 질문 내 날씨 조건 반영, 확인된 데이터 없을 때 임의 추천 금지를 테스트한다.
 - 출처 도메인 표시: 백엔드 응답의 `sourceDomains`와 프론트엔드의 출처 도메인 섹션을 검증한다.
 - 주 1회/수동 데이터 갱신: `.github/workflows/data-refresh.yml`은 weekly cron과 `workflow_dispatch`만 제공하며, staging validation과 smoke가 성공한 후에만 promote한다.

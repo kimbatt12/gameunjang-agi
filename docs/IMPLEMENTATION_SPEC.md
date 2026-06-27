@@ -207,12 +207,14 @@ LLMClient
 
 ## 6.3 호출 정책
 
-1. 먼저 규칙/키워드 기반 관광 관련성 판별을 수행한다.
-2. 명확히 비관광 질문이면 LLM 호출 없이 안내 응답을 반환한다.
-3. 관광 관련 질문이면 소형 모델을 호출한다.
-4. Upstage 호출 실패 시 OpenRouter fallback을 시도한다.
-5. fallback도 실패하면 API 결과 기반의 최소 템플릿 답변 또는 오류 안내를 반환한다.
-6. 응답 토큰은 기본 800 tokens 이내로 제한한다.
+1. 먼저 LLM scope classifier로 국내 관광 관련성 판별을 수행한다.
+2. classifier는 `domestic_tourism` 또는 `out_of_scope` label만 반환한다.
+3. `out_of_scope`이면 외부 검색/Tourism/KMA API 호출 없이 안내 응답을 반환한다.
+4. classifier provider가 없거나 사용할 수 없거나 응답 label이 올바르지 않으면 안전한 범위 안내로 종료한다.
+5. `domestic_tourism`이면 API 라우팅/후보 선택과 답변 생성 경로를 진행한다.
+6. Upstage 호출 실패 시 설정된 OpenRouter fallback을 시도한다.
+7. 답변 생성 fallback도 실패하면 API 결과 기반의 최소 템플릿 답변 또는 오류 안내를 반환한다.
+8. 답변 생성 응답 토큰은 기본 800 tokens 이내로 제한하고, scope classifier는 작은 prompt와 낮은 `max_tokens`로 운영한다.
 
 ## 6.4 모델 후보 결정 필요 항목
 
@@ -239,11 +241,12 @@ POST /api/chat
   ↓
 4. 입력 정규화
   ↓
-5. 국내 관광 관련성 규칙 판별
-  ├─ 명확히 비관광 → rejection 응답
-  └─ 관광/애매함 → 계속
+5. LLM scope classifier 국내 관광 관련성 판별
+  ├─ out_of_scope → rejection 응답
+  ├─ provider 누락/오류/비정상 label → rejection 응답
+  └─ domestic_tourism → 계속
   ↓
-6. API 메타데이터 인덱스 검색
+6. API 메타데이터 인덱스 검색 및 라우팅 후보 선택
   ↓
 7. LLM으로 의도 구조화 및 API 호출 계획 생성
   ↓
@@ -340,6 +343,8 @@ POST /api/chat
 ---
 
 ## 10. API 라우팅 / 의미검색
+
+이 단계는 LLM scope classifier가 `domestic_tourism`으로 수락한 질문에만 적용한다. 키워드와 라우팅 메타데이터는 Tourism/KMA API 후보 선택에 사용한다.
 
 ## 10.1 MVP 방식
 
@@ -602,7 +607,7 @@ MVP 구현 전 결정 필요.
 ## 16.3 Integration tests
 
 - 관광 질문 → API 후보 선택 → mock API 결과 → 답변 생성
-- 비관광 질문 → LLM/API 호출 없이 거절
+- 비관광 질문 → LLM scope classification 후 Tourism/KMA API 호출 없이 거절
 - 날씨 조건 질문 → 기상청 client 호출
 - 공식 링크 없는 결과 → 보완 조회 생략
 - Upstage 실패 → OpenRouter fallback
@@ -619,7 +624,7 @@ MVP 구현 전 결정 필요.
 4. 브라우저 세션당 10회 제한 구현
 5. Vercel Python Function adapter 생성
 6. backend 스키마/설정 모듈 구현
-7. 관광 관련성 guard 구현
+7. LLM-first 관광 관련성 guard 구현
 8. API 메타데이터 JSON 샘플과 loader 구현
 9. API 라우팅 키워드 인덱스 구현
 10. LLM adapter base/upstage/openrouter/fake 구현

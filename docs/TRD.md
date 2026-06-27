@@ -250,9 +250,10 @@ Vercel 단일 프로젝트로 배포하되, 디렉토리는 `frontend/`와 `back
   ↓
 1. 입력 정규화
   ↓
-2. 국내 관광 관련성 판별
-  ├─ 아니오 → 거절 응답
-  └─ 예 → 계속
+2. LLM scope classifier 국내 관광 관련성 판별
+  ├─ out_of_scope → 거절 응답
+  ├─ provider 누락/오류/비정상 label → 거절 응답
+  └─ domestic_tourism → 계속
   ↓
 3. 질문 의도 추출
   ↓
@@ -277,31 +278,15 @@ Vercel 단일 프로젝트로 배포하되, 디렉토리는 `frontend/`와 `back
 
 ## 6.2 국내 관광 Guard
 
-우선순위:
+국내 관광 관련성은 `/api/chat` 진입 초기에 LLM scope classifier가 먼저 판별한다. classifier는 strict label인 `domestic_tourism` 또는 `out_of_scope`만 반환하며, `domestic_tourism`으로 수락된 질문만 API 라우팅 단계로 이동한다.
 
-1. 규칙 기반 판별
-2. 키워드/지역명/관광 카테고리 기반 판별
-3. 애매한 경우에만 LLM 판별
+운영 기준:
 
-관광 관련 키워드 예:
-
-- 여행
-- 관광
-- 관광지
-- 숙소
-- 호텔
-- 펜션
-- 맛집
-- 음식점
-- 축제
-- 행사
-- 코스
-- 일정
-- 아이와
-- 가족여행
-- 실내
-- 비 오는 날
-- 지역명
+1. scope classifier는 작은 prompt와 낮은 `max_tokens`로 호출한다.
+2. provider는 adapter와 provider/fallback 설정으로 교체 가능하게 둔다.
+3. provider 누락, provider 오류, malformed label은 안전한 범위 안내로 종료한다.
+4. public 응답의 경고는 사용자에게 노출하지 않고 `warnings: []`로 유지한다.
+5. 키워드/지역명/관광 카테고리 신호는 scope 수락 이후 Tourism/KMA API 후보 선택에 사용한다.
 
 거절 조건 예:
 
@@ -313,17 +298,18 @@ Vercel 단일 프로젝트로 배포하되, 디렉토리는 `frontend/`와 `back
 
 ## 7. LLM 사용 전략
 
-사용자 결정: **모든 관광 관련 질문에 소형 LLM 호출 + 강한 캐싱으로 비용 절감**
+사용자 결정: **국내 관광 여부는 LLM-first로 판별하고, 수락된 관광 질문은 소형 LLM 호출 + 강한 캐싱으로 비용 절감**
 
 ## 7.1 LLM 호출 위치
 
 LLM은 다음 단계에서 사용할 수 있다.
 
-1. 질문 의도 구조화
-2. API 후보 선택 보조
-3. API 파라미터 생성 보조
-4. API 결과 기반 답변 생성
-5. 일정 생성
+1. 국내 관광 scope classification
+2. 질문 의도 구조화
+3. API 후보 선택 보조
+4. API 파라미터 생성 보조
+5. API 결과 기반 답변 생성
+6. 일정 생성
 
 단, 비용 절감을 위해 다음을 적용한다.
 
@@ -334,6 +320,9 @@ LLM은 다음 단계에서 사용할 수 있다.
 - 답변에 필요한 컨텍스트만 주입
 - 소형 모델 우선
 - 모델 교체 가능한 어댑터 구조
+- 브라우저 세션당 10회 질문 제한
+- scope classifier의 작은 prompt와 낮은 `max_tokens`
+- provider/fallback 설정
 
 ## 7.2 LLM Provider Adapter
 

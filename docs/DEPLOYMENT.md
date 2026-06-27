@@ -45,7 +45,7 @@ PUBLIC_APP_BASE_URL=https://example.invalid
 4. Preview URL에서 `/health`가 `{"status":"ok"}`를 반환하는지 확인한다.
 5. Preview URL에서 `/api/chat` happy path로 국내 관광 질문이 200 응답과 `sourceDomains`를 반환하는지 확인한다.
 6. Preview URL에서 `/api/chat` error path로 빈 message 또는 길이 초과 message가 422를 반환하는지 확인한다.
-7. 비관광 질문이 LLM/API 호출 없이 국내 관광 범위 안내와 빈 `sourceDomains`를 반환하는지 확인한다.
+7. 비관광 질문이 LLM scope classification 후 Tourism/KMA API 호출 없이 국내 관광 범위 안내와 빈 `sourceDomains`, `warnings: []`를 반환하는지 확인한다.
 8. 브라우저 세션 질문 10회 제한 안내가 표시되고 11번째 질문 전송이 차단되는지 확인한다.
 9. Function 로그에서 secret 값이 출력되지 않고, 오류 path가 stack trace 없이 예상 상태 코드로 처리되는지 확인한다.
 10. 비용 점검: 일 1,000쿼리 기준 LLM 호출 수, 캐시 hit rate, 예상 비용이 `docs/COST_CONTROL.md` 게이트를 통과하는지 확인한다.

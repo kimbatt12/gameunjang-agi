@@ -40,8 +40,8 @@
 
 - [x] `/api/chat` 요청/응답 스키마를 구현한다.
 - [x] 입력 길이 제한과 기본 검증을 적용한다.
-- [x] 국내 관광 관련성 guard를 우선 규칙/키워드 기반으로 구현한다.
-- [x] 비관광 질문은 LLM/API 호출을 건너뛰고 정중한 범위 안내로 처리한다.
+- [x] 국내 관광 관련성 guard를 LLM-first scope classifier 기반으로 구현한다.
+- [x] 비관광 질문은 LLM scope classification 후 Tourism/KMA API 호출 없이 정중한 범위 안내로 처리한다.
 - [x] 응답에 `answer`, `items`, `sourceDomains`, `warnings`를 일관되게 포함한다.
 - [x] 백엔드 검증: `ruff check .`, `ruff format --check .`, `pytest`가 통과한다.
 - [x] 백엔드 검증: 관광 질문, 비관광 안내, 입력 길이, 응답 스키마 테스트를 포함한다.
@@ -50,7 +50,7 @@
 
 - [x] 한국관광공사 API 메타데이터 JSON 스키마를 확정한다.
 - [x] MVP 우선 API 유형을 기준으로 샘플 메타데이터를 준비한다.
-- [x] 정적 JSON + 키워드/간단 의미검색 기반 API 후보 선택을 구현한다.
+- [x] LLM scope 수락 이후 정적 JSON + 키워드/간단 의미검색 기반 API 후보 선택을 구현한다.
 - [x] 지역명, 관광 카테고리, 동의어 기반 라우팅을 추가한다.
 - [x] 낮은 관련도 또는 정보 부족 상황의 응답 정책을 구현한다.
 - [x] 데이터 검증: 메타데이터 JSON schema 검사를 통과한다.
