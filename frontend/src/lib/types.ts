@@ -2,12 +2,12 @@ export type ChatResponseType = 'answer' | 'rejection' | 'limit_exceeded';
 
 export type ChatItem = {
   title: string;
-  reason?: string;
-  address?: string;
-  openingHours?: string;
-  price?: string;
-  officialUrl?: string;
-  mapUrl?: string;
+  reason?: string | null;
+  address?: string | null;
+  openingHours?: string | null;
+  price?: string | null;
+  officialUrl?: string | null;
+  mapUrl?: string | null;
 };
 
 export type ChatResponse = {
