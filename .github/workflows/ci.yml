@@ -20,6 +20,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24.x
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Setup Python
         if: ${{ hashFiles('backend/pyproject.toml') != '' }}
@@ -30,7 +32,15 @@ jobs:
       - name: Validate frontend package
         run: |
           if [ -f frontend/package.json ]; then
-            npm ci --prefix frontend
+            for attempt in 1 2 3; do
+              if npm ci --prefix frontend; then
+                break
+              fi
+              if [ "$attempt" -eq 3 ]; then
+                exit 1
+              fi
+              sleep $((attempt * 5))
+            done
             for script in lint typecheck test build; do
               if node -e "const pkg = require('./frontend/package.json'); process.exit(pkg.scripts && pkg.scripts[process.argv[1]] ? 0 : 1)" "$script"; then
                 npm run "$script" --prefix frontend

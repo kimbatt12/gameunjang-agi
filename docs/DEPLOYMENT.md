@@ -23,7 +23,6 @@ UPSTAGE_API_KEY=replace-with-upstage-api-key
 UPSTAGE_MODEL=replace-with-upstage-model-name
 OPENROUTER_API_KEY=replace-with-openrouter-api-key
 OPENROUTER_MODEL=replace-with-openrouter-model-name
-KMA_API_KEY=replace-with-kma-api-key
 APP_BASE_URL=https://example.invalid
 MAX_BROWSER_SESSION_QUESTIONS=10
 MAX_USER_MESSAGE_CHARS=1000
@@ -42,7 +41,7 @@ PUBLIC_APP_BASE_URL=https://example.invalid
 
 1. Frontend validation: `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build` from `frontend/`.
 2. Backend validation: `ruff check .`, `ruff format --check .`, `pytest` from `backend/`.
-3. Preview 환경변수 이름이 모두 존재하는지 확인한다. 값은 Vercel UI/CLI secret store에서만 확인하고 로그에 출력하지 않는다.
+3. Preview 환경변수 이름이 모두 존재하는지 확인한다. 기상청 단기예보 조회서비스도 공공데이터포털 `TOUR_API_SERVICE_KEY`를 사용한다. 값은 Vercel UI/CLI secret store에서만 확인하고 로그에 출력하지 않는다.
 4. Preview URL에서 `/health`가 `{"status":"ok"}`를 반환하는지 확인한다.
 5. Preview URL에서 `/api/chat` happy path로 국내 관광 질문이 200 응답과 `sourceDomains`를 반환하는지 확인한다.
 6. Preview URL에서 `/api/chat` error path로 빈 message 또는 길이 초과 message가 422를 반환하는지 확인한다.

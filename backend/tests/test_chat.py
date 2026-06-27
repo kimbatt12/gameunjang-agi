@@ -259,6 +259,61 @@ def test_chat_weather_question_calls_weather_api_when_injected() -> None:
     assert "weather_api_not_called_using_question_condition" not in payload["warnings"]
 
 
+def test_chat_weather_question_uses_tour_api_service_key_for_default_weather_client(
+    monkeypatch,
+) -> None:
+    tourism_client = _RecordingTourismClient(
+        {
+            "response": {
+                "body": {
+                    "items": {
+                        "item": [
+                            {
+                                "contentid": "busan-indoor-1",
+                                "title": "부산 실내 전시관",
+                                "addr1": "부산광역시 해운대구",
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    )
+    created_clients: list[_RecordingDefaultWeatherClient] = []
+
+    def recording_weather_client(
+        *,
+        service_key: str,
+    ) -> _RecordingDefaultWeatherClient:
+        client = _RecordingDefaultWeatherClient(service_key)
+        created_clients.append(client)
+        return client
+
+    monkeypatch.setenv("TOUR_API_SERVICE_KEY", "placeholder-tour-key")
+    monkeypatch.delenv("KMA_API_KEY", raising=False)
+    monkeypatch.setattr("app.chat_service.KoreaWeatherClient", recording_weather_client)
+    get_settings.cache_clear()
+    try:
+        client = TestClient(create_app(tourism_client=tourism_client))
+
+        response = client.post(
+            "/api/chat", json={"message": "부산 비 오는 날 실내 관광지"}
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert [client.service_key for client in created_clients] == [
+            "placeholder-tour-key"
+        ]
+        assert created_clients[0].calls
+        assert "weather_api_unavailable" in payload["warnings"]
+        assert (
+            "weather_api_not_called_using_question_condition" not in payload["warnings"]
+        )
+    finally:
+        get_settings.cache_clear()
+
+
 def test_fetch_tourism_items_skips_candidate_with_unresolved_required_param() -> None:
     from app.chat_service import _fetch_tourism_items
 
@@ -379,3 +434,18 @@ class _RecordingWeatherClient:
     def get_vilage_forecast(self, params: dict[str, str | int]) -> WeatherResult:
         self.calls.append(params)
         return self._result
+
+
+class _RecordingDefaultWeatherClient:
+    def __init__(self, service_key: str) -> None:
+        self.service_key = service_key
+        self.calls: list[dict[str, str | int]] = []
+
+    def get_vilage_forecast(self, params: dict[str, str | int]) -> WeatherResult:
+        self.calls.append(params)
+        return WeatherResult(
+            available=False,
+            forecasts=(),
+            source_domain=None,
+            warnings=("weather_api_unavailable",),
+        )
