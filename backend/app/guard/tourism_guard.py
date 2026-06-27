@@ -109,6 +109,7 @@ NON_TOURISM_KEYWORDS = frozenset(
         "아이돌",
         "수학",
         "번역",
+        "보고서",
         "레시피",
         "법률",
         "의학",
