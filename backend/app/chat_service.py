@@ -297,9 +297,9 @@ def _default_tourism_client(settings: Settings) -> KoreaTourismClient | None:
 
 
 def _default_weather_client(settings: Settings) -> KoreaWeatherClient | None:
-    if settings.kma_api_key is None:
+    if settings.tour_api_service_key is None:
         return None
-    return KoreaWeatherClient(service_key=settings.kma_api_key)
+    return KoreaWeatherClient(service_key=settings.tour_api_service_key)
 
 
 def _default_llm_provider(settings: Settings) -> LLMProvider | None:

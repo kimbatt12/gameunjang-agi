@@ -10,7 +10,6 @@ class Settings:
         *,
         max_user_message_chars: int,
         tour_api_service_key: str | None,
-        kma_api_key: str | None,
         upstage_api_key: str | None,
         upstage_model: str | None,
         openrouter_api_key: str | None,
@@ -18,7 +17,6 @@ class Settings:
     ) -> None:
         self.max_user_message_chars = max_user_message_chars
         self.tour_api_service_key = tour_api_service_key
-        self.kma_api_key = kma_api_key
         self.upstage_api_key = upstage_api_key
         self.upstage_model = upstage_model
         self.openrouter_api_key = openrouter_api_key
@@ -38,7 +36,6 @@ def get_settings() -> Settings:
     return Settings(
         max_user_message_chars=max(1, parsed_limit),
         tour_api_service_key=_optional_env("TOUR_API_SERVICE_KEY"),
-        kma_api_key=_optional_env("KMA_API_KEY"),
         upstage_api_key=_optional_env("UPSTAGE_API_KEY"),
         upstage_model=_optional_env("UPSTAGE_MODEL"),
         openrouter_api_key=_optional_env("OPENROUTER_API_KEY"),

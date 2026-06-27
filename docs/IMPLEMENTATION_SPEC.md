@@ -160,7 +160,7 @@ Milestone 0의 실제 구조와 아래 목표 구조의 차이는 `docs/PROJECT_
 `backend/.env.example`에 아래 키를 placeholder 예시값으로 정의한다. 실제 값은 로컬 `.env` 또는 배포 secret store에서 관리한다. 브라우저에 노출 가능한 프론트엔드 공개 설정은 `frontend/.env.example`에만 둔다.
 
 ```text
-# 한국관광공사 공공데이터 API
+# 공공데이터포털 API: 한국관광공사, 기상청 단기예보 조회서비스
 TOUR_API_SERVICE_KEY=replace-with-tour-api-service-key
 
 # LLM provider
@@ -174,9 +174,6 @@ UPSTAGE_MODEL=replace-with-upstage-model-name
 # OpenRouter fallback
 OPENROUTER_API_KEY=replace-with-openrouter-api-key
 OPENROUTER_MODEL=replace-with-openrouter-model-name
-
-# 기상청 API
-KMA_API_KEY=replace-with-kma-api-key
 
 # Runtime limits
 MAX_BROWSER_SESSION_QUESTIONS=10
@@ -644,7 +641,7 @@ MVP 구현 전 결정 필요.
 1. `UPSTAGE_MODEL` 기본 모델명
 2. `OPENROUTER_MODEL` fallback 모델명
 3. 한국관광공사 API 실제 목록 및 응답 포맷
-4. 기상청 API 키 발급 방식과 사용할 endpoint
+4. 기상청 단기예보 조회서비스 endpoint(`getVilageFcst`)의 요청 파라미터 세부값
 5. Vercel Python Function 실행시간 제한 내 복잡 일정 추천 가능 여부
 6. 지도 링크 생성 방식
 7. Vercel 로컬 개발 방식

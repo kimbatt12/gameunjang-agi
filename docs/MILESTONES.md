@@ -68,7 +68,7 @@
 - [x] `/api/chat`이 한국관광공사 실응답 항목을 정규화해 답변 생성 입력으로 전달한다. Vercel Preview 응답에서 실제 TourAPI 항목, `api_data_first_answer`, `llm_composed_answer` 경고와 함께 `confirmed_api_item_data_unavailable` 미포함을 확인했다.
 - [x] `/api/chat` 관광 답변 경로에서 설계대로 LLM/provider를 호출한다. Vercel Preview 응답에서 `llm_composed_answer` 경고를 확인했다.
 - [x] `/api/chat` 관광 답변 경로의 TourAPI+LLM mock/regression 배선 테스트를 갖춘다.
-- [ ] `/api/chat` 날씨 조건 질문에서 기상청 API를 실제 호출하고 실패 시 graceful degradation을 적용한다. Vercel에는 `TOUR_API_SERVICE_KEY`와 `UPSTAGE_*`가 있으나 `KMA_API_KEY`가 없어 live runtime 통합/검증은 차단됨.
+- [ ] `/api/chat` 날씨 조건 질문에서 기상청 API를 실제 호출하고 실패 시 graceful degradation을 적용한다. 기상청 단기예보 조회서비스는 공공데이터포털 `TOUR_API_SERVICE_KEY`를 함께 사용하며, live runtime 통합/검증은 Preview에서 별도 확인이 필요하다.
 - [x] 연동 검증: provider mock 테스트로 성공·fallback·timeout 흐름을 확인한다.
 - [x] 연동 검증: 관광공사·기상청 응답 fixture가 정규화 스키마와 맞다.
 
