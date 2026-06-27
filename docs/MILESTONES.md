@@ -64,10 +64,11 @@
 - [x] 한국관광공사 API client와 응답 정규화를 구현한다.
 - [x] 기상청 API client와 실패 시 graceful degradation을 구현한다.
 - [x] API 응답에 포함된 공식 링크만 보완 조회하도록 제한한다.
-- [ ] `/api/chat` 관광 답변 경로에서 한국관광공사 API를 실제 호출한다.
-- [ ] `/api/chat`이 한국관광공사 실응답 항목을 정규화해 답변 생성 입력으로 전달한다.
-- [ ] `/api/chat` 관광 답변 경로에서 설계대로 LLM/provider를 호출한다.
-- [ ] `/api/chat` 날씨 조건 질문에서 기상청 API를 실제 호출하고 실패 시 graceful degradation을 적용한다.
+- [ ] `/api/chat` 관광 답변 경로에서 한국관광공사 API를 실제 호출한다. 로컬/테스트 배선은 있으나 실제 배포 런타임 검증 전까지 완료로 보지 않는다.
+- [ ] `/api/chat`이 한국관광공사 실응답 항목을 정규화해 답변 생성 입력으로 전달한다. mock/regression 검증은 통과하나 live runtime 검증은 남아 있다.
+- [ ] `/api/chat` 관광 답변 경로에서 설계대로 LLM/provider를 호출한다. provider mock/regression 검증은 있으나 실제 배포 런타임 검증 전까지 완료로 보지 않는다.
+- [x] `/api/chat` 관광 답변 경로의 TourAPI+LLM mock/regression 배선 테스트를 갖춘다.
+- [ ] `/api/chat` 날씨 조건 질문에서 기상청 API를 실제 호출하고 실패 시 graceful degradation을 적용한다. Vercel에는 `TOUR_API_SERVICE_KEY`와 `UPSTAGE_*`가 있으나 `KMA_API_KEY`가 없어 live runtime 통합/검증은 차단됨.
 - [x] 연동 검증: provider mock 테스트로 성공·fallback·timeout 흐름을 확인한다.
 - [x] 연동 검증: 관광공사·기상청 응답 fixture가 정규화 스키마와 맞다.
 
@@ -79,8 +80,8 @@
 - [x] 날씨 조건을 추천 순서와 경고에 반영한다.
 - [x] 출처 도메인을 답변 하단 또는 응답 필드에 표시한다.
 - [x] 공식 출처 도메인과 API 제공 링크 중심의 답변 근거를 구현한다.
-- [ ] `/api/chat`이 정규화된 실제 관광 항목을 `compose_answer`에 넘겨 답변을 만든다.
-- [ ] `강릉 2박 3일 코스` 같은 대표 답변 가능 질문에서 API 데이터가 있으면 `confirmed_api_item_data_unavailable`을 반환하지 않는다.
+- [x] `/api/chat`이 정규화된 실제 관광 항목을 `compose_answer`에 넘겨 답변을 만든다.
+- [x] `강릉 2박 3일 코스` 같은 대표 답변 가능 질문에서 API 데이터가 있으면 `confirmed_api_item_data_unavailable`을 반환하지 않는다.
 - [ ] 날씨 조건 질문은 실제 날씨 데이터를 답변 순서, 경고, 출처에 반영한다.
 - [x] 답변 검증: 출처 도메인, 경고, 추천 항목, 일정 형식 스냅샷 테스트를 통과한다.
 - [x] 답변 검증: 날씨·일정·정보 부족 케이스가 안내 문구와 맞다.
@@ -106,7 +107,7 @@
 - [x] 통합 검증: 프론트엔드에서 `/api/chat`까지 happy path와 오류 path가 통과한다.
 - [ ] 통합 검증: `/api/chat` 대표 관광 질문이 한국관광공사 API 호출, 실항목 정규화, `compose_answer`, LLM/provider 호출까지 통과한다.
 - [ ] 통합 검증: 날씨 조건 질문이 기상청 API 호출과 날씨 반영 답변까지 통과한다.
-- [ ] 회귀 검증: 현재 gap처럼 `강릉 2박 3일 코스`가 답변 가능 데이터가 있는데도 `confirmed_api_item_data_unavailable`로 끝나면 실패한다.
+- [x] 회귀 검증: 현재 gap처럼 `강릉 2박 3일 코스`가 답변 가능 데이터가 있는데도 `confirmed_api_item_data_unavailable`로 끝나면 실패한다.
 - [x] 배포 검증: preview 배포 smoke, 환경변수 체크, function 로그 확인을 완료한다.
 
 ## 9. MVP 완료 기준

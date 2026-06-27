@@ -1,11 +1,17 @@
 from fastapi import FastAPI, HTTPException, status
 
-from app.chat_service import build_chat_response
+from app.chat_service import TourismClient, WeatherClient, build_chat_response
 from app.config import get_settings
+from app.external.llm import LLMProvider
 from app.schemas import ChatRequest, ChatResponse, HealthResponse
 
 
-def create_app() -> FastAPI:
+def create_app(
+    *,
+    tourism_client: TourismClient | None = None,
+    weather_client: WeatherClient | None = None,
+    llm_provider: LLMProvider | None = None,
+) -> FastAPI:
     app = FastAPI(
         title="Gameunjang-agi API",
         version="0.1.0",
@@ -28,7 +34,12 @@ def create_app() -> FastAPI:
                 ),
             )
 
-        return build_chat_response(request.message.strip())
+        return build_chat_response(
+            request.message.strip(),
+            tourism_client=tourism_client,
+            weather_client=weather_client,
+            llm_provider=llm_provider,
+        )
 
     return app
 

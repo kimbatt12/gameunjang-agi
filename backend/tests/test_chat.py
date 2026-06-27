@@ -1,7 +1,11 @@
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
+from app.external.llm import LLMResponse
+from app.external.weather import WeatherResult
 from app.main import create_app
+from app.routing import CandidateSelection, RoutedApiCandidate
+from app.routing.metadata import load_tour_api_metadata_index
 
 
 def test_chat_accepts_domestic_tourism_question() -> None:
@@ -158,3 +162,220 @@ def test_chat_tourism_source_policy_uses_allowed_api_candidate_domain() -> None:
     assert set(payload["sourceDomains"]).issubset({"data.go.kr", "visitkorea.or.kr"})
     assert "선택된 API 후보 도메인:" in payload["answer"]
     assert "confirmed_api_item_data_unavailable" in payload["warnings"]
+
+
+def test_chat_answerable_tourism_question_uses_tourism_api_and_llm() -> None:
+    tourism_client = _RecordingTourismClient(
+        {
+            "response": {
+                "body": {
+                    "items": {
+                        "item": [
+                            {
+                                "contentid": "gn-course-1",
+                                "title": "강릉 바다 커피거리 코스",
+                                "addr1": "강원특별자치도 강릉시 창해로",
+                                "homepage": (
+                                    '<a href="https://www.visitkorea.or.kr">공식</a>'
+                                ),
+                            },
+                            {
+                                "contentid": "gn-course-2",
+                                "title": "오죽헌 역사 산책 코스",
+                                "addr1": "강원특별자치도 강릉시 율곡로3139번길 24",
+                            },
+                        ]
+                    }
+                }
+            }
+        }
+    )
+    llm_provider = _RecordingLLMProvider()
+    client = TestClient(
+        create_app(tourism_client=tourism_client, llm_provider=llm_provider)
+    )
+
+    response = client.post("/api/chat", json={"message": "강릉 2박 3일 코스"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert tourism_client.calls
+    endpoint, params = tourism_client.calls[0]
+    assert endpoint == "areaBasedList2"
+    assert params["areaCode"] == "32"
+    assert params["sigunguCode"] == "1"
+    assert params["contentTypeId"] == "25"
+    assert payload["items"][0]["title"] == "강릉 바다 커피거리 코스"
+    assert payload["items"][0]["officialUrl"] == "https://www.visitkorea.or.kr"
+    assert "confirmed_api_item_data_unavailable" not in payload["warnings"]
+    assert "api_data_first_answer" in payload["warnings"]
+    assert "llm_composed_answer" in payload["warnings"]
+    assert payload["answer"] == "LLM composed answer using 강릉 바다 커피거리 코스"
+    assert llm_provider.requests
+    prompt = llm_provider.requests[0].messages[-1].content
+    assert "강릉 바다 커피거리 코스" in prompt
+    assert "오죽헌 역사 산책 코스" in prompt
+
+
+def test_chat_weather_question_calls_weather_api_when_injected() -> None:
+    tourism_client = _RecordingTourismClient(
+        {
+            "response": {
+                "body": {
+                    "items": {
+                        "item": [
+                            {
+                                "contentid": "busan-indoor-1",
+                                "title": "부산 실내 전시관",
+                                "addr1": "부산광역시 해운대구",
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    )
+    weather_client = _RecordingWeatherClient(
+        WeatherResult(
+            available=False,
+            forecasts=(),
+            source_domain=None,
+            warnings=("weather_api_unavailable",),
+        )
+    )
+    client = TestClient(
+        create_app(tourism_client=tourism_client, weather_client=weather_client)
+    )
+
+    response = client.post("/api/chat", json={"message": "부산 비 오는 날 실내 관광지"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert weather_client.calls
+    params = weather_client.calls[0]
+    assert params["nx"] == 98
+    assert params["ny"] == 76
+    assert "weather_api_unavailable" in payload["warnings"]
+    assert "weather_api_not_called_using_question_condition" not in payload["warnings"]
+
+
+def test_fetch_tourism_items_skips_candidate_with_unresolved_required_param() -> None:
+    from app.chat_service import _fetch_tourism_items
+
+    apis = {api.id: api for api in load_tour_api_metadata_index().apis}
+    selection = CandidateSelection(
+        candidates=(
+            RoutedApiCandidate(
+                api=apis["detail_common"],
+                score=20,
+                matched_regions=(),
+                matched_categories=("detail",),
+                matched_terms=("공식", "운영시간"),
+            ),
+            RoutedApiCandidate(
+                api=apis["area_based_list"],
+                score=10,
+                matched_regions=("경주",),
+                matched_categories=("attraction",),
+                matched_terms=("관광지",),
+            ),
+        ),
+        matched_regions=("경주",),
+        matched_categories=("detail", "attraction"),
+        is_low_relevance=False,
+        reason="api_candidates_selected",
+    )
+    tourism_client = _RecordingTourismClient(
+        {
+            "response": {
+                "body": {"items": {"item": [{"contentid": "1", "title": "불국사"}]}}
+            }
+        }
+    )
+
+    items, warnings = _fetch_tourism_items(
+        selection=selection,
+        tourism_client=tourism_client,
+    )
+
+    assert warnings == []
+    assert items[0].title == "불국사"
+    assert tourism_client.calls == [
+        (
+            "areaBasedList2",
+            {
+                "numOfRows": 10,
+                "pageNo": 1,
+                "arrange": "A",
+                "areaCode": "35",
+                "sigunguCode": "2",
+            },
+        )
+    ]
+    assert "contentId" not in tourism_client.calls[0][1]
+
+
+def test_fetch_tourism_items_skips_keyword_candidate_without_matched_region() -> None:
+    from app.chat_service import _fetch_tourism_items
+
+    apis = {api.id: api for api in load_tour_api_metadata_index().apis}
+    selection = CandidateSelection(
+        candidates=(
+            RoutedApiCandidate(
+                api=apis["search_keyword"],
+                score=10,
+                matched_regions=(),
+                matched_categories=("keyword",),
+                matched_terms=("검색",),
+            ),
+        ),
+        matched_regions=(),
+        matched_categories=("keyword",),
+        is_low_relevance=False,
+        reason="api_candidates_selected",
+    )
+    tourism_client = _RecordingTourismClient({"response": {"body": {"items": {}}}})
+
+    items, warnings = _fetch_tourism_items(
+        selection=selection,
+        tourism_client=tourism_client,
+    )
+
+    assert items == ()
+    assert warnings == []
+    assert tourism_client.calls == []
+
+
+class _RecordingTourismClient:
+    def __init__(self, payload: dict[str, object]) -> None:
+        self._payload = payload
+        self.calls: list[tuple[str, dict[str, str | int]]] = []
+
+    def get(self, endpoint: str, params: dict[str, str | int]) -> dict[str, object]:
+        self.calls.append((endpoint, params))
+        return self._payload
+
+
+class _RecordingLLMProvider:
+    name = "recording-llm"
+
+    def __init__(self) -> None:
+        self.requests = []
+
+    def complete(self, request):
+        self.requests.append(request)
+        return LLMResponse(
+            text="LLM composed answer using 강릉 바다 커피거리 코스",
+            provider=self.name,
+            model="test-model",
+        )
+
+
+class _RecordingWeatherClient:
+    def __init__(self, result: WeatherResult) -> None:
+        self._result = result
+        self.calls: list[dict[str, str | int]] = []
+
+    def get_vilage_forecast(self, params: dict[str, str | int]) -> WeatherResult:
+        self.calls.append(params)
+        return self._result

@@ -237,9 +237,7 @@ def _weather_context(
     weather: WeatherResult | None,
 ) -> dict[str, str | bool | None]:
     inferred_adverse = _message_has_adverse_weather_condition(message)
-    requires_weather = inferred_adverse or any(
-        term in message for term in WEATHER_REQUIRED_TERMS
-    )
+    requires_weather = requires_weather_api(message)
     if weather and weather.available and weather.forecasts:
         forecast_adverse = _forecast_has_adverse_weather(weather)
         adverse = inferred_adverse or forecast_adverse
@@ -266,6 +264,12 @@ def _weather_context(
             "summary": "질문의 날씨 조건을 반영해 실내 항목을 우선했습니다.",
         }
     return {"required": requires_weather, "adverse": False, "summary": None}
+
+
+def requires_weather_api(message: str) -> bool:
+    return _message_has_adverse_weather_condition(message) or any(
+        term in message for term in WEATHER_REQUIRED_TERMS
+    )
 
 
 def _message_has_adverse_weather_condition(message: str) -> bool:

@@ -40,6 +40,16 @@ def test_tour_api_metadata_matches_declared_schema_shape() -> None:
     }
 
 
+def test_tour_api_metadata_endpoints_are_relative_to_service_base_url() -> None:
+    payload = json.loads(read_tour_api_metadata_text())
+
+    endpoints = {api["endpoint"] for api in payload["apis"]}
+
+    assert endpoints >= {"areaBasedList2", "searchFestival2", "searchStay2"}
+    assert all(not endpoint.startswith("/") for endpoint in endpoints)
+    assert all("B551011/KorService2" not in endpoint for endpoint in endpoints)
+
+
 def test_routes_region_and_indoor_category_to_area_based_list() -> None:
     selection = select_api_candidates("부산 실내 관광지 추천")
 

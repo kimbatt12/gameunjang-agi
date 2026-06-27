@@ -25,6 +25,7 @@ def test_tourism_client_normalizes_fixture_schema() -> None:
 def test_tourism_client_calls_public_api_with_placeholder_key() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/B551011/KorService2/areaBasedList2"
+        assert request.url.path.count("/B551011/KorService2") == 1
         assert request.url.params["serviceKey"] == "placeholder-tour-key"
         assert request.url.params["_type"] == "json"
         return httpx.Response(200, json=_load_fixture("tourism_area_based_list.json"))
