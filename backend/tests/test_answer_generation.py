@@ -521,10 +521,7 @@ def test_insufficient_information_case_keeps_no_sources_or_items() -> None:
 
     assert response.items == []
     assert response.sourceDomains == []
-    assert response.warnings == [
-        "insufficient_region_or_category_signal",
-        "no_external_call_due_to_insufficient_information",
-    ]
+    assert response.warnings == []
     assert "국내 지역명" in response.answer
 
 

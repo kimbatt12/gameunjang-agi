@@ -10,16 +10,6 @@ export function ChatMessage({ message }: { message: ConversationMessage }) {
     <article className="message message-assistant">
       <p className="answer-text">{message.response.answer}</p>
       {message.response.items?.length ? <ItemList items={message.response.items} /> : null}
-      {message.response.warnings.length ? (
-        <section className="response-section" aria-label="경고">
-          <h3>안내</h3>
-          <ul>
-            {message.response.warnings.map((warning) => (
-              <li key={warning}>{warning}</li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
       {message.response.sourceDomains.length ? (
         <section className="source-domains" aria-label="출처 도메인">
           출처: {message.response.sourceDomains.join(', ')}

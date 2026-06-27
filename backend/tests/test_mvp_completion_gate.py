@@ -68,7 +68,7 @@ def test_mvp_non_tourism_question_returns_scope_guidance_without_sources() -> No
     assert payload["isTourismRelated"] is False
     assert "국내 관광 관련 질문" in payload["answer"]
     assert payload["sourceDomains"] == []
-    assert payload["warnings"] == ["out_of_scope_no_external_call"]
+    assert payload["warnings"] == []
 
 
 def test_mvp_itinerary_and_weather_answers_are_limited_to_confirmed_data() -> None:

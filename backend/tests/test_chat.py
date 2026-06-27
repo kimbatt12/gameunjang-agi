@@ -8,7 +8,8 @@ from app.routing import CandidateSelection, RoutedApiCandidate
 from app.routing.metadata import load_tour_api_metadata_index
 
 
-def test_chat_accepts_domestic_tourism_question() -> None:
+def test_chat_accepts_domestic_tourism_question(caplog) -> None:
+    caplog.set_level("INFO", logger="app.chat_service")
     client = TestClient(create_app())
 
     response = client.post(
@@ -32,12 +33,19 @@ def test_chat_accepts_domestic_tourism_question() -> None:
         "확인된 API 항목 데이터가 없어 추천 항목을 제공하지 않습니다"
         in payload["answer"]
     )
-    assert "api_data_first_answer" not in payload["warnings"]
-    assert "confirmed_api_item_data_unavailable" in payload["warnings"]
-    assert "weather_api_not_called_using_question_condition" in payload["warnings"]
+    assert payload["warnings"] == []
+    _assert_logged_chat_warnings(
+        caplog,
+        response_type="answer",
+        warnings=[
+            "confirmed_api_item_data_unavailable",
+            "weather_api_not_called_using_question_condition",
+        ],
+    )
 
 
-def test_chat_rejects_non_tourism_question_without_sources() -> None:
+def test_chat_rejects_non_tourism_question_without_sources(caplog) -> None:
+    caplog.set_level("INFO", logger="app.chat_service")
     llm_provider = _SequenceLLMProvider(["domestic_tourism"])
     client = TestClient(create_app(llm_provider=llm_provider))
 
@@ -56,7 +64,12 @@ def test_chat_rejects_non_tourism_question_without_sources() -> None:
     assert "국내 관광 관련 질문" in payload["answer"]
     assert payload["items"] == []
     assert payload["sourceDomains"] == []
-    assert payload["warnings"] == ["out_of_scope_no_external_call"]
+    assert payload["warnings"] == []
+    _assert_logged_chat_warnings(
+        caplog,
+        response_type="rejection",
+        warnings=["out_of_scope_no_external_call"],
+    )
     assert llm_provider.requests == []
 
 
@@ -75,7 +88,7 @@ def test_chat_rejects_foreign_travel_question_without_llm_recheck() -> None:
     assert payload["isTourismRelated"] is False
     assert payload["items"] == []
     assert payload["sourceDomains"] == []
-    assert payload["warnings"] == ["out_of_scope_no_external_call"]
+    assert payload["warnings"] == []
     assert llm_provider.requests == []
 
 
@@ -89,7 +102,7 @@ def test_non_tourism_scope_guidance_skips_external_source_policy() -> None:
     assert payload["type"] == "rejection"
     assert "여행지, 관광지, 축제, 숙소, 음식점, 여행코스" in payload["answer"]
     assert payload["sourceDomains"] == []
-    assert payload["warnings"] == ["out_of_scope_no_external_call"]
+    assert payload["warnings"] == []
 
 
 def test_chat_rejects_message_over_configured_length(monkeypatch) -> None:
@@ -166,10 +179,7 @@ def test_chat_asks_for_more_info_when_region_is_missing() -> None:
     assert "국내 지역명" in payload["answer"]
     assert payload["items"] == []
     assert payload["sourceDomains"] == []
-    assert payload["warnings"] == [
-        "insufficient_region_or_category_signal",
-        "no_external_call_due_to_insufficient_information",
-    ]
+    assert payload["warnings"] == []
 
 
 def test_chat_tourism_source_policy_uses_allowed_api_candidate_domain() -> None:
@@ -182,10 +192,11 @@ def test_chat_tourism_source_policy_uses_allowed_api_candidate_domain() -> None:
     assert payload["isTourismRelated"] is True
     assert set(payload["sourceDomains"]).issubset({"data.go.kr", "visitkorea.or.kr"})
     assert "선택된 API 후보 도메인:" in payload["answer"]
-    assert "confirmed_api_item_data_unavailable" in payload["warnings"]
+    assert payload["warnings"] == []
 
 
-def test_chat_answerable_tourism_question_uses_tourism_api_and_llm() -> None:
+def test_chat_answerable_tourism_question_uses_tourism_api_and_llm(caplog) -> None:
+    caplog.set_level("INFO", logger="app.chat_service")
     tourism_client = _RecordingTourismClient(
         {
             "response": {
@@ -228,9 +239,12 @@ def test_chat_answerable_tourism_question_uses_tourism_api_and_llm() -> None:
     assert params["contentTypeId"] == "25"
     assert payload["items"][0]["title"] == "강릉 바다 커피거리 코스"
     assert payload["items"][0]["officialUrl"] == "https://www.visitkorea.or.kr"
-    assert "confirmed_api_item_data_unavailable" not in payload["warnings"]
-    assert "api_data_first_answer" in payload["warnings"]
-    assert "llm_composed_answer" in payload["warnings"]
+    assert payload["warnings"] == []
+    _assert_logged_chat_warnings(
+        caplog,
+        response_type="answer",
+        warnings=["api_data_first_answer", "llm_composed_answer"],
+    )
     assert payload["answer"] == "LLM composed answer using 강릉 바다 커피거리 코스"
     assert llm_provider.requests
     prompt = llm_provider.requests[0].messages[-1].content
@@ -253,10 +267,11 @@ def test_guard_accepted_tourism_question_skips_llm_scope_recheck() -> None:
     assert payload["isTourismRelated"] is True
     assert tourism_client.calls
     assert llm_provider.requests == []
-    assert "llm_scope_recheck_accepted" not in payload["warnings"]
+    assert payload["warnings"] == []
 
 
-def test_guard_rejected_llm_scope_recheck_can_continue_to_answer_flow() -> None:
+def test_guard_rejected_llm_scope_recheck_can_continue_to_answer_flow(caplog) -> None:
+    caplog.set_level("INFO", logger="app.chat_service")
     tourism_client = _RecordingTourismClient(
         {
             "response": {
@@ -290,8 +305,16 @@ def test_guard_rejected_llm_scope_recheck_can_continue_to_answer_flow() -> None:
     assert tourism_client.calls
     assert len(llm_provider.requests) == 2
     assert payload["answer"] == "LLM composed answer using 전주 한옥마을 산책"
-    assert "llm_scope_recheck_accepted" in payload["warnings"]
-    assert "out_of_scope_no_external_call" not in payload["warnings"]
+    assert payload["warnings"] == []
+    _assert_logged_chat_warnings(
+        caplog,
+        response_type="answer",
+        warnings=[
+            "llm_scope_recheck_accepted",
+            "api_data_first_answer",
+            "llm_composed_answer",
+        ],
+    )
 
 
 def test_ambiguous_guard_rejected_llm_scope_recheck_keeps_out_of_scope_rejection() -> (
@@ -309,7 +332,7 @@ def test_ambiguous_guard_rejected_llm_scope_recheck_keeps_out_of_scope_rejection
     payload = response.json()
     assert payload["type"] == "rejection"
     assert payload["isTourismRelated"] is False
-    assert payload["warnings"] == ["out_of_scope_after_llm_scope_recheck"]
+    assert payload["warnings"] == []
     assert tourism_client.calls == []
     assert len(llm_provider.requests) == 1
 
@@ -332,13 +355,14 @@ def test_ambiguous_guard_rejection_without_llm_provider_keeps_no_external_call_w
         payload = response.json()
         assert payload["type"] == "rejection"
         assert payload["isTourismRelated"] is False
-        assert payload["warnings"] == ["out_of_scope_no_external_call"]
+        assert payload["warnings"] == []
         assert tourism_client.calls == []
     finally:
         get_settings.cache_clear()
 
 
-def test_guard_rejected_llm_scope_recheck_failure_fails_closed() -> None:
+def test_guard_rejected_llm_scope_recheck_failure_fails_closed(caplog) -> None:
+    caplog.set_level("INFO", logger="app.chat_service")
     tourism_client = _RecordingTourismClient({"response": {"body": {"items": {}}}})
     llm_provider = _SequenceLLMProvider([LLMProviderError("classifier failed")])
     client = TestClient(
@@ -351,10 +375,15 @@ def test_guard_rejected_llm_scope_recheck_failure_fails_closed() -> None:
     payload = response.json()
     assert payload["type"] == "rejection"
     assert payload["isTourismRelated"] is False
-    assert payload["warnings"] == [
-        "out_of_scope_after_llm_scope_recheck",
-        "llm_scope_recheck_unavailable",
-    ]
+    assert payload["warnings"] == []
+    _assert_logged_chat_warnings(
+        caplog,
+        response_type="rejection",
+        warnings=[
+            "out_of_scope_after_llm_scope_recheck",
+            "llm_scope_recheck_unavailable",
+        ],
+    )
     assert tourism_client.calls == []
     assert len(llm_provider.requests) == 1
 
@@ -372,10 +401,7 @@ def test_guard_rejected_llm_scope_recheck_malformed_output_fails_closed() -> Non
     payload = response.json()
     assert payload["type"] == "rejection"
     assert payload["isTourismRelated"] is False
-    assert payload["warnings"] == [
-        "out_of_scope_after_llm_scope_recheck",
-        "llm_scope_recheck_unavailable",
-    ]
+    assert payload["warnings"] == []
     assert tourism_client.calls == []
     assert len(llm_provider.requests) == 1
 
@@ -418,8 +444,7 @@ def test_chat_weather_question_calls_weather_api_when_injected() -> None:
     params = weather_client.calls[0]
     assert params["nx"] == 98
     assert params["ny"] == 76
-    assert "weather_api_unavailable" in payload["warnings"]
-    assert "weather_api_not_called_using_question_condition" not in payload["warnings"]
+    assert payload["warnings"] == []
 
 
 def test_chat_weather_question_uses_tour_api_service_key_for_default_weather_client(
@@ -469,10 +494,7 @@ def test_chat_weather_question_uses_tour_api_service_key_for_default_weather_cli
             "placeholder-tour-key"
         ]
         assert created_clients[0].calls
-        assert "weather_api_unavailable" in payload["warnings"]
-        assert (
-            "weather_api_not_called_using_question_condition" not in payload["warnings"]
-        )
+        assert payload["warnings"] == []
     finally:
         get_settings.cache_clear()
 
@@ -562,6 +584,25 @@ def test_fetch_tourism_items_skips_keyword_candidate_without_matched_region() ->
     assert items == ()
     assert warnings == []
     assert tourism_client.calls == []
+
+
+def _assert_logged_chat_warnings(
+    caplog,
+    *,
+    response_type: str,
+    warnings: list[str],
+) -> None:
+    matching_records = [
+        record
+        for record in caplog.records
+        if record.name == "app.chat_service"
+        and record.message == "chat response produced"
+        and getattr(record, "response_type", None) == response_type
+    ]
+    assert matching_records
+    logged_warnings = getattr(matching_records[-1], "warnings", [])
+    for warning in warnings:
+        assert warning in logged_warnings
 
 
 class _RecordingTourismClient:
