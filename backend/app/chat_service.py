@@ -71,25 +71,43 @@ def build_chat_response(
     llm_provider: LLMProvider | None = None,
 ) -> ChatResponse:
     guard_result = is_domestic_tourism_question(message)
+    settings: Settings | None = None
+    llm = llm_provider
+    warnings: list[str] = []
 
     if not guard_result.is_tourism_related:
-        return ChatResponse(
-            type="rejection",
-            isTourismRelated=False,
-            answer=SCOPE_GUIDANCE,
-            items=[],
-            sourceDomains=[],
-            warnings=["out_of_scope_no_external_call"],
+        if not _should_recheck_scope_with_llm(guard_result.reason):
+            return _build_out_of_scope_response(
+                warnings=["out_of_scope_no_external_call"]
+            )
+
+        settings = get_settings()
+        llm = llm_provider or _default_llm_provider(settings)
+        if llm is None:
+            return _build_out_of_scope_response(
+                warnings=["out_of_scope_no_external_call"]
+            )
+        is_reclassified, recheck_warning = _recheck_scope_with_llm(
+            message=message,
+            llm_provider=llm,
         )
+        if not is_reclassified:
+            rejection_warnings = ["out_of_scope_after_llm_scope_recheck"]
+            if recheck_warning is not None:
+                rejection_warnings.append(recheck_warning)
+            return _build_out_of_scope_response(warnings=rejection_warnings)
+        warnings.append("llm_scope_recheck_accepted")
 
     selection = select_api_candidates(message)
     if selection.is_low_relevance:
-        return _build_insufficient_information_response(selection)
+        response = _build_insufficient_information_response(selection)
+        response.warnings.extend(warnings)
+        return response
 
-    settings = get_settings()
+    settings = settings or get_settings()
     tourism = tourism_client or _default_tourism_client(settings)
     weather = weather_client or _default_weather_client(settings)
-    llm = llm_provider or _default_llm_provider(settings)
+    llm = llm or _default_llm_provider(settings)
 
     api_items, integration_warnings = _fetch_tourism_items(
         selection=selection,
@@ -106,6 +124,7 @@ def build_chat_response(
         api_items=api_items,
         weather=weather_result,
     )
+    response.warnings.extend(warnings)
     response.warnings.extend(integration_warnings)
     return _compose_with_llm(
         message=message,
@@ -113,6 +132,59 @@ def build_chat_response(
         api_items=api_items,
         llm_provider=llm,
     )
+
+
+def _build_out_of_scope_response(*, warnings: list[str]) -> ChatResponse:
+    return ChatResponse(
+        type="rejection",
+        isTourismRelated=False,
+        answer=SCOPE_GUIDANCE,
+        items=[],
+        sourceDomains=[],
+        warnings=warnings,
+    )
+
+
+def _should_recheck_scope_with_llm(guard_reason: str) -> bool:
+    return guard_reason == "insufficient_domestic_tourism_signal"
+
+
+def _recheck_scope_with_llm(
+    *,
+    message: str,
+    llm_provider: LLMProvider | None,
+) -> tuple[bool, str | None]:
+    if llm_provider is None:
+        return False, None
+
+    try:
+        llm_response = llm_provider.complete(
+            LLMRequest(
+                messages=(
+                    LLMMessage(
+                        role="system",
+                        content=(
+                            "사용자 질문이 국내 관광 질문인지 분류하세요. "
+                            "국내 여행지, 관광지, 축제, 숙소, 음식점, "
+                            "여행코스 질문이면 domestic_tourism만 답하세요. "
+                            "그 외에는 out_of_scope만 답하세요."
+                        ),
+                    ),
+                    LLMMessage(role="user", content=message),
+                ),
+                max_tokens=8,
+                temperature=0,
+            )
+        )
+    except LLMProviderError:
+        return False, "llm_scope_recheck_unavailable"
+
+    classification = llm_response.text.strip().lower().strip("\"'`.,:;")
+    if classification == "domestic_tourism":
+        return True, None
+    if classification == "out_of_scope" or classification == "not_domestic_tourism":
+        return False, None
+    return False, "llm_scope_recheck_unavailable"
 
 
 def _build_insufficient_information_response(

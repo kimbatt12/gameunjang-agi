@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
-from app.external.llm import LLMResponse
+from app.external.llm import LLMProviderError, LLMResponse
 from app.external.weather import WeatherResult
 from app.main import create_app
 from app.routing import CandidateSelection, RoutedApiCandidate
@@ -38,7 +38,8 @@ def test_chat_accepts_domestic_tourism_question() -> None:
 
 
 def test_chat_rejects_non_tourism_question_without_sources() -> None:
-    client = TestClient(create_app())
+    llm_provider = _SequenceLLMProvider(["domestic_tourism"])
+    client = TestClient(create_app(llm_provider=llm_provider))
 
     response = client.post(
         "/api/chat",
@@ -56,6 +57,26 @@ def test_chat_rejects_non_tourism_question_without_sources() -> None:
     assert payload["items"] == []
     assert payload["sourceDomains"] == []
     assert payload["warnings"] == ["out_of_scope_no_external_call"]
+    assert llm_provider.requests == []
+
+
+def test_chat_rejects_foreign_travel_question_without_llm_recheck() -> None:
+    llm_provider = _SequenceLLMProvider(["domestic_tourism"])
+    client = TestClient(create_app(llm_provider=llm_provider))
+
+    response = client.post(
+        "/api/chat",
+        json={"message": "오사카 2박 3일 여행 코스 추천해줘"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["type"] == "rejection"
+    assert payload["isTourismRelated"] is False
+    assert payload["items"] == []
+    assert payload["sourceDomains"] == []
+    assert payload["warnings"] == ["out_of_scope_no_external_call"]
+    assert llm_provider.requests == []
 
 
 def test_non_tourism_scope_guidance_skips_external_source_policy() -> None:
@@ -215,6 +236,148 @@ def test_chat_answerable_tourism_question_uses_tourism_api_and_llm() -> None:
     prompt = llm_provider.requests[0].messages[-1].content
     assert "강릉 바다 커피거리 코스" in prompt
     assert "오죽헌 역사 산책 코스" in prompt
+
+
+def test_guard_accepted_tourism_question_skips_llm_scope_recheck() -> None:
+    tourism_client = _RecordingTourismClient({"response": {"body": {"items": {}}}})
+    llm_provider = _SequenceLLMProvider(["true"])
+    client = TestClient(
+        create_app(tourism_client=tourism_client, llm_provider=llm_provider)
+    )
+
+    response = client.post("/api/chat", json={"message": "강릉 2박 3일 코스"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["type"] == "answer"
+    assert payload["isTourismRelated"] is True
+    assert tourism_client.calls
+    assert llm_provider.requests == []
+    assert "llm_scope_recheck_accepted" not in payload["warnings"]
+
+
+def test_guard_rejected_llm_scope_recheck_can_continue_to_answer_flow() -> None:
+    tourism_client = _RecordingTourismClient(
+        {
+            "response": {
+                "body": {
+                    "items": {
+                        "item": [
+                            {
+                                "contentid": "jj-keyword-1",
+                                "title": "전주 한옥마을 산책",
+                                "addr1": "전북특별자치도 전주시 완산구",
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    )
+    llm_provider = _SequenceLLMProvider(
+        ["domestic_tourism", "LLM composed answer using 전주 한옥마을 산책"]
+    )
+    client = TestClient(
+        create_app(tourism_client=tourism_client, llm_provider=llm_provider)
+    )
+
+    response = client.post("/api/chat", json={"message": "한옥마을 주변"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["type"] == "answer"
+    assert payload["isTourismRelated"] is True
+    assert tourism_client.calls
+    assert len(llm_provider.requests) == 2
+    assert payload["answer"] == "LLM composed answer using 전주 한옥마을 산책"
+    assert "llm_scope_recheck_accepted" in payload["warnings"]
+    assert "out_of_scope_no_external_call" not in payload["warnings"]
+
+
+def test_ambiguous_guard_rejected_llm_scope_recheck_keeps_out_of_scope_rejection() -> (
+    None
+):
+    tourism_client = _RecordingTourismClient({"response": {"body": {"items": {}}}})
+    llm_provider = _SequenceLLMProvider(["not_domestic_tourism"])
+    client = TestClient(
+        create_app(tourism_client=tourism_client, llm_provider=llm_provider)
+    )
+
+    response = client.post("/api/chat", json={"message": "한옥마을 주변"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["type"] == "rejection"
+    assert payload["isTourismRelated"] is False
+    assert payload["warnings"] == ["out_of_scope_after_llm_scope_recheck"]
+    assert tourism_client.calls == []
+    assert len(llm_provider.requests) == 1
+
+
+def test_ambiguous_guard_rejection_without_llm_provider_keeps_no_external_call_warning(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("UPSTAGE_API_KEY", raising=False)
+    monkeypatch.delenv("UPSTAGE_MODEL", raising=False)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("OPENROUTER_MODEL", raising=False)
+    get_settings.cache_clear()
+    try:
+        tourism_client = _RecordingTourismClient({"response": {"body": {"items": {}}}})
+        client = TestClient(create_app(tourism_client=tourism_client))
+
+        response = client.post("/api/chat", json={"message": "한옥마을 주변"})
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["type"] == "rejection"
+        assert payload["isTourismRelated"] is False
+        assert payload["warnings"] == ["out_of_scope_no_external_call"]
+        assert tourism_client.calls == []
+    finally:
+        get_settings.cache_clear()
+
+
+def test_guard_rejected_llm_scope_recheck_failure_fails_closed() -> None:
+    tourism_client = _RecordingTourismClient({"response": {"body": {"items": {}}}})
+    llm_provider = _SequenceLLMProvider([LLMProviderError("classifier failed")])
+    client = TestClient(
+        create_app(tourism_client=tourism_client, llm_provider=llm_provider)
+    )
+
+    response = client.post("/api/chat", json={"message": "한옥마을 주변"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["type"] == "rejection"
+    assert payload["isTourismRelated"] is False
+    assert payload["warnings"] == [
+        "out_of_scope_after_llm_scope_recheck",
+        "llm_scope_recheck_unavailable",
+    ]
+    assert tourism_client.calls == []
+    assert len(llm_provider.requests) == 1
+
+
+def test_guard_rejected_llm_scope_recheck_malformed_output_fails_closed() -> None:
+    tourism_client = _RecordingTourismClient({"response": {"body": {"items": {}}}})
+    llm_provider = _SequenceLLMProvider(["maybe"])
+    client = TestClient(
+        create_app(tourism_client=tourism_client, llm_provider=llm_provider)
+    )
+
+    response = client.post("/api/chat", json={"message": "한옥마을 주변"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["type"] == "rejection"
+    assert payload["isTourismRelated"] is False
+    assert payload["warnings"] == [
+        "out_of_scope_after_llm_scope_recheck",
+        "llm_scope_recheck_unavailable",
+    ]
+    assert tourism_client.calls == []
+    assert len(llm_provider.requests) == 1
 
 
 def test_chat_weather_question_calls_weather_api_when_injected() -> None:
@@ -424,6 +587,21 @@ class _RecordingLLMProvider:
             provider=self.name,
             model="test-model",
         )
+
+
+class _SequenceLLMProvider:
+    name = "sequence-llm"
+
+    def __init__(self, responses) -> None:
+        self._responses = list(responses)
+        self.requests = []
+
+    def complete(self, request):
+        self.requests.append(request)
+        response = self._responses.pop(0)
+        if isinstance(response, LLMProviderError):
+            raise response
+        return LLMResponse(text=response, provider=self.name, model="test-model")
 
 
 class _RecordingWeatherClient:
