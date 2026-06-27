@@ -1,4 +1,4 @@
-export function getSafeHttpUrl(value: string | undefined): string | null {
+export function getSafeHttpUrl(value: string | null | undefined): string | null {
   if (!value) {
     return null;
   }

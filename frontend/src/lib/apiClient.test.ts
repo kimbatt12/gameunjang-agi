@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { backendChatResponseWithNullOptionalItemFields } from '../test/fixtures/backendChatResponse.js';
 import { ChatApiError, sendChatMessage } from './apiClient.js';
 import type { ChatApiRequest, ChatResponse } from './types.js';
 
@@ -38,6 +39,15 @@ describe('sendChatMessage', () => {
     assert.deepEqual(response, validResponse);
   });
 
+  it('accepts backend-shaped /api/chat responses with null optional item fields', async () => {
+    const response = await sendChatMessage(
+      request,
+      createJsonFetcher(backendChatResponseWithNullOptionalItemFields),
+    );
+
+    assert.deepEqual(response, backendChatResponseWithNullOptionalItemFields);
+  });
+
   it('posts /api/chat happy path requests with the expected JSON contract', async () => {
     const calls: Array<{ input: string | URL | Request; init?: RequestInit }> = [];
     const fetcher: typeof fetch = async (input, init) => {
@@ -70,7 +80,7 @@ describe('sendChatMessage', () => {
   it('rejects malformed nested API item payloads', async () => {
     const malformedResponse = {
       ...validResponse,
-      items: [{ title: '부산시립미술관', reason: null }],
+      items: [{ title: '부산시립미술관', officialUrl: 123 }],
     };
 
     await assert.rejects(

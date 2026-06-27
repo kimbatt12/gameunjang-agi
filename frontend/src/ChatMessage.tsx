@@ -54,7 +54,7 @@ function ItemList({ items }: { items: ChatItem[] }) {
   );
 }
 
-function SafeItemLink({ href, label }: { href: string | undefined; label: string }) {
+function SafeItemLink({ href, label }: { href: string | null | undefined; label: string }) {
   const safeHref = getSafeHttpUrl(href);
   return safeHref ? <a href={safeHref}>{label}</a> : null;
 }

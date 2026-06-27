@@ -31,17 +31,17 @@ function isChatItem(payload: unknown): payload is ChatItem {
   const candidate = payload as Partial<ChatItem>;
   return (
     typeof candidate.title === 'string' &&
-    isOptionalString(candidate.reason) &&
-    isOptionalString(candidate.address) &&
-    isOptionalString(candidate.openingHours) &&
-    isOptionalString(candidate.price) &&
-    isOptionalString(candidate.officialUrl) &&
-    isOptionalString(candidate.mapUrl)
+    isOptionalNullableString(candidate.reason) &&
+    isOptionalNullableString(candidate.address) &&
+    isOptionalNullableString(candidate.openingHours) &&
+    isOptionalNullableString(candidate.price) &&
+    isOptionalNullableString(candidate.officialUrl) &&
+    isOptionalNullableString(candidate.mapUrl)
   );
 }
 
-function isOptionalString(value: unknown): value is string | undefined {
-  return value === undefined || typeof value === 'string';
+function isOptionalNullableString(value: unknown): value is string | null | undefined {
+  return value === undefined || value === null || typeof value === 'string';
 }
 
 function isString(value: unknown): value is string {
