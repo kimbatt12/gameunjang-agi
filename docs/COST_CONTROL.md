@@ -7,7 +7,7 @@
 - MVP 비용 목표는 월 1달러 미만이다.
 - 일 1,000 쿼리를 상한 기준으로 점검한다.
 - 비관광 질문은 LLM scope classification 후 Tourism/KMA API 호출 없이 범위 안내로 종료한다.
-- 비용 통제는 브라우저 세션당 10회 질문 제한, 작은 classifier prompt/낮은 `max_tokens`, adapter 추상화, provider/fallback 설정, 캐시와 템플릿 답변을 함께 사용해 달성한다.
+- 비용 통제는 브라우저 세션당 10회 질문 제한, 작은 classifier/route-selector prompt와 낮은 `max_tokens`, adapter 추상화, provider/fallback 설정, 캐시와 템플릿 답변을 함께 사용해 달성한다.
 
 ## 테스트 가능한 기준
 
@@ -15,7 +15,7 @@
 
 - `total_queries`: 일간 전체 요청 수
 - `cache_hits`: 캐시 또는 템플릿으로 처리된 요청 수
-- `llm_call_count`: scope classification과 답변 생성을 포함한 실제 LLM 호출 수
+- `llm_call_count`: scope classification, API route selection, 답변 생성을 포함한 실제 LLM 호출 수
 - `estimated_cost_per_llm_call_usd`: provider별 예상 단가
 
 기본 게이트는 다음과 같다.

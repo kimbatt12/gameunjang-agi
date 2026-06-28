@@ -82,12 +82,12 @@ def test_routes_itinerary_synonym_to_course_related_candidates() -> None:
     assert "search_stay" in candidate_ids
 
 
-def test_routes_natural_tourism_question_without_region_to_default_region() -> None:
+def test_routes_natural_tourism_question_without_region_to_nationwide() -> None:
     selection = select_api_candidates("이번 주말에 갈만한데 있어?")
 
     assert selection.is_low_relevance is False
     assert selection.reason == "api_candidates_selected"
-    assert selection.matched_regions == ("서울",)
+    assert selection.matched_regions == ()
     assert "attraction" in selection.matched_categories
     assert selection.candidates[0].api.id == "area_based_list"
 
@@ -102,10 +102,10 @@ def test_routes_region_without_category_to_default_attraction() -> None:
     assert selection.candidates[0].api.id == "area_based_list"
 
 
-def test_default_region_policy_when_region_is_missing() -> None:
+def test_nationwide_policy_when_region_is_missing() -> None:
     selection = select_api_candidates("축제 알려줘")
 
     assert selection.is_low_relevance is False
     assert selection.reason == "api_candidates_selected"
-    assert selection.matched_regions == ("서울",)
+    assert selection.matched_regions == ()
     assert selection.matched_categories == ("festival",)

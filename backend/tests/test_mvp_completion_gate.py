@@ -47,7 +47,8 @@ def test_mvp_chat_smoke_answers_mobile_domestic_tourism_question() -> None:
         "sourceDomains",
         "warnings",
     }
-    assert len(llm_provider.requests) == 1
+    assert len(llm_provider.requests) == 2
+    assert "api route candidates" in llm_provider.requests[1].messages[0].content
 
 
 def test_mvp_api_candidate_selection_matches_question_intent() -> None:

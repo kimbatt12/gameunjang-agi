@@ -1,3 +1,4 @@
+import json
 import logging
 from datetime import UTC, datetime
 from typing import Protocol
@@ -101,6 +102,11 @@ def _build_chat_response_with_internal_warnings(
     warnings.append("llm_scope_classified_domestic_tourism")
 
     selection = select_api_candidates(message, default_missing_signals=True)
+    selection = _select_api_routes_with_llm(
+        message=message,
+        selection=selection,
+        llm_provider=llm,
+    )
     if selection.is_low_relevance:
         response = _build_insufficient_information_response(selection)
         response.warnings.extend(warnings)
@@ -209,6 +215,129 @@ def _classify_scope_with_llm(
     return ScopeClassification(
         label="out_of_scope",
         reason="llm_scope_classification_malformed",
+    )
+
+
+def _select_api_routes_with_llm(
+    *,
+    message: str,
+    selection: CandidateSelection,
+    llm_provider: LLMProvider | None,
+) -> CandidateSelection:
+    if llm_provider is None or not selection.candidates:
+        return selection
+
+    prompt = _api_route_prompt(message=message, selection=selection)
+    try:
+        llm_response = llm_provider.complete(
+            LLMRequest(
+                messages=(
+                    LLMMessage(
+                        role="system",
+                        content=(
+                            "Choose the best Korea Tourism API route candidates. "
+                            'Return only strict JSON: {"ids":["candidate_id"]}. '
+                            "Use only IDs from the api route candidates list."
+                        ),
+                    ),
+                    LLMMessage(role="user", content=prompt),
+                ),
+                max_tokens=80,
+                temperature=0,
+            )
+        )
+    except LLMProviderError:
+        return selection
+    except IndexError:
+        return selection
+
+    selected_ids = _parse_route_candidate_ids(llm_response.text)
+    candidate_by_id = {
+        candidate.api.id: candidate for candidate in selection.candidates
+    }
+    selected_candidates = tuple(
+        candidate_by_id[candidate_id]
+        for candidate_id in selected_ids
+        if candidate_id in candidate_by_id
+    )
+    if not selected_candidates:
+        return selection
+
+    selected_id_set = {candidate.api.id for candidate in selected_candidates}
+    remaining_candidates = tuple(
+        candidate
+        for candidate in selection.candidates
+        if candidate.api.id not in selected_id_set
+    )
+    return CandidateSelection(
+        candidates=selected_candidates + remaining_candidates,
+        matched_regions=selection.matched_regions,
+        matched_categories=selection.matched_categories,
+        is_low_relevance=selection.is_low_relevance,
+        reason=selection.reason,
+    )
+
+
+def _api_route_prompt(*, message: str, selection: CandidateSelection) -> str:
+    candidate_lines = []
+    for candidate in selection.candidates:
+        api = candidate.api
+        region_hint = (
+            ",".join(candidate.matched_regions)
+            if candidate.matched_regions
+            else "nationwide-capable"
+        )
+        category_hint = ",".join(api.categories[:4])
+        candidate_lines.append(
+            f"{api.id}|{api.endpoint}|priority={api.priority}|"
+            f"categories={category_hint}|regions={region_hint}|"
+            f"summary={api.description}|search={api.searchText}"
+        )
+    return (
+        f"question={message}\n"
+        f"detected_regions={','.join(selection.matched_regions) or 'nationwide'}\n"
+        f"detected_categories={','.join(selection.matched_categories) or 'none'}\n"
+        "api route candidates:\n" + "\n".join(candidate_lines)
+    )
+
+
+def _parse_route_candidate_ids(text: str) -> tuple[str, ...]:
+    stripped = text.strip()
+    if not stripped:
+        return ()
+
+    try:
+        payload = json.loads(stripped)
+    except json.JSONDecodeError:
+        cleaned = stripped.strip("` \n\t.,;:'\"")
+        return (cleaned,) if _is_candidate_id(cleaned) else ()
+
+    if isinstance(payload, str):
+        return (payload,) if _is_candidate_id(payload) else ()
+    if isinstance(payload, list):
+        return tuple(
+            item for item in payload if isinstance(item, str) and _is_candidate_id(item)
+        )
+    if isinstance(payload, dict):
+        for key in ("ids", "candidate_ids", "api_ids"):
+            value = payload.get(key)
+            if isinstance(value, list):
+                return tuple(
+                    item
+                    for item in value
+                    if isinstance(item, str) and _is_candidate_id(item)
+                )
+        for key in ("id", "candidate_id", "api_id"):
+            value = payload.get(key)
+            if isinstance(value, str) and _is_candidate_id(value):
+                return (value,)
+    return ()
+
+
+def _is_candidate_id(value: str) -> bool:
+    return bool(value) and all(
+        character.islower() or character.isdigit() or character == "_"
+        for character in value
     )
 
 
