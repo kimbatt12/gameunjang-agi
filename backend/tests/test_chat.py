@@ -1,6 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from app.chat_service import _parse_scope_label
 from app.config import get_settings
 from app.external.llm import LLMProviderError, LLMResponse
 from app.external.weather import WeatherResult
@@ -236,6 +237,53 @@ def test_chat_uses_known_llm_route_candidate_id() -> None:
     assert tourism_client.calls[0][0] == "searchFestival2"
     assert "areaCode" not in tourism_client.calls[0][1]
     assert _routing_prompts(llm_provider)
+
+
+def test_chat_accepts_busan_festival_question_with_llm_route_candidate() -> None:
+    tourism_client = _RecordingTourismClient({"response": {"body": {"items": {}}}})
+    llm_provider = _SequenceLLMProvider(["domestic_tourism", "search_festival"])
+    client = TestClient(
+        create_app(tourism_client=tourism_client, llm_provider=llm_provider)
+    )
+
+    response = client.post("/api/chat", json={"message": "부산 축제 알려줘"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["type"] == "answer"
+    assert payload["isTourismRelated"] is True
+    assert tourism_client.calls
+    assert tourism_client.calls[0][0] == "searchFestival2"
+    assert tourism_client.calls[0][1]["areaCode"] == "6"
+    assert payload["warnings"] == []
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ('{"label":"domestic_tourism"}', "domestic_tourism"),
+        ("domestic_tourism입니다", "domestic_tourism"),
+        ('```json\n{"label":"out_of_scope"}\n```', "out_of_scope"),
+    ],
+)
+def test_scope_label_parsing_accepts_harmless_extra_text(
+    text,
+    expected,
+) -> None:
+    assert _parse_scope_label(text) == expected
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "domestic_tourism 또는 out_of_scope",
+        "국내 관광 질문입니다",
+        "not domestic_tourism",
+        "domestic_tourism is wrong",
+    ],
+)
+def test_scope_label_parsing_fails_closed_for_both_or_no_labels(text) -> None:
+    assert _parse_scope_label(text) is None
 
 
 def test_chat_falls_back_when_llm_route_output_is_unknown_without_seoul_default() -> (

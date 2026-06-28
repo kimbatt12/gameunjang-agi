@@ -56,6 +56,9 @@ REGION_WEATHER_GRIDS: dict[str, tuple[int, int]] = {
 
 logger = logging.getLogger(__name__)
 
+SUPPORTED_SCOPE_LABELS = frozenset({"domestic_tourism", "out_of_scope"})
+KOREAN_LABEL_SUFFIXES = ("입니다", "이에요", "예요")
+
 
 class TourismClient(Protocol):
     def get(self, endpoint: str, params: dict[str, str | int]) -> dict[str, object]:
@@ -185,11 +188,15 @@ def _classify_scope_with_llm(
                         content=(
                             "사용자 질문이 국내 관광 질문인지 분류하세요. "
                             "반드시 domestic_tourism 또는 out_of_scope 중 "
-                            "하나의 라벨만 답하세요. 자연스러운 한국어 표현도 "
-                            "고려하세요. 국내 여행, 관광, 장소, 명소, 음식, 숙소, "
-                            "축제, 산책, 스키장, 여행 코스, 갈 만한 곳을 묻는 "
-                            "질문이면 domestic_tourism입니다. 해외 여행이나 "
-                            "관광과 무관한 질문은 out_of_scope입니다."
+                            "하나의 라벨만 답하세요. 자연스러운 한국어 표현과 "
+                            "짧은 구어체도 고려하세요. 국내 여행, 관광, 장소, "
+                            "명소, 음식, 숙소, 축제, 산책, 스키장, 여행 코스, "
+                            "갈 만한 곳을 묻는 질문이면 domestic_tourism입니다. "
+                            "예: 부산 축제 알려줘 -> domestic_tourism, "
+                            "전주 맛집 추천 -> domestic_tourism, "
+                            "제주 숙소 알려줘 -> domestic_tourism, "
+                            "강릉 1박 2일 루트 짜줘 -> domestic_tourism. "
+                            "해외 여행이나 관광과 무관한 질문은 out_of_scope입니다."
                         ),
                     ),
                     LLMMessage(role="user", content=message),
@@ -204,7 +211,7 @@ def _classify_scope_with_llm(
             reason="llm_scope_classification_failed",
         )
 
-    classification = llm_response.text.strip().lower().strip("\"'`.,:;")
+    classification = _parse_scope_label(llm_response.text)
     if classification == "domestic_tourism":
         return ScopeClassification(label="domestic_tourism")
     if classification == "out_of_scope":
@@ -216,6 +223,48 @@ def _classify_scope_with_llm(
         label="out_of_scope",
         reason="llm_scope_classification_malformed",
     )
+
+
+def _parse_scope_label(text: str) -> str | None:
+    normalized = _strip_markdown_code_fence(text.strip())
+    json_label = _parse_scope_label_json(normalized)
+    if json_label is not None:
+        return json_label
+    return _parse_scope_label_plain(normalized)
+
+
+def _parse_scope_label_json(text: str) -> str | None:
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    if isinstance(payload, str):
+        return _parse_scope_label_plain(payload)
+    if isinstance(payload, dict):
+        label = payload.get("label")
+        if isinstance(label, str):
+            return _parse_scope_label_plain(label)
+    return None
+
+
+def _parse_scope_label_plain(text: str) -> str | None:
+    normalized = text.strip().lower().strip("` \n\t.,:;!?'\"")
+    if normalized in SUPPORTED_SCOPE_LABELS:
+        return normalized
+    for label in SUPPORTED_SCOPE_LABELS:
+        if any(normalized == f"{label}{suffix}" for suffix in KOREAN_LABEL_SUFFIXES):
+            return label
+    return None
+
+
+def _strip_markdown_code_fence(text: str) -> str:
+    stripped = text.strip()
+    if not stripped.startswith("```") or not stripped.endswith("```"):
+        return stripped
+    lines = stripped.splitlines()
+    if len(lines) < 3:
+        return stripped
+    return "\n".join(lines[1:-1]).strip()
 
 
 def _select_api_routes_with_llm(
