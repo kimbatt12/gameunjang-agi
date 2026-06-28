@@ -1,3 +1,4 @@
+import json
 import logging
 from datetime import UTC, datetime
 from typing import Protocol
@@ -55,6 +56,9 @@ REGION_WEATHER_GRIDS: dict[str, tuple[int, int]] = {
 
 logger = logging.getLogger(__name__)
 
+SUPPORTED_SCOPE_LABELS = frozenset({"domestic_tourism", "out_of_scope"})
+KOREAN_LABEL_SUFFIXES = ("입니다", "이에요", "예요")
+
 
 class TourismClient(Protocol):
     def get(self, endpoint: str, params: dict[str, str | int]) -> dict[str, object]:
@@ -101,6 +105,11 @@ def _build_chat_response_with_internal_warnings(
     warnings.append("llm_scope_classified_domestic_tourism")
 
     selection = select_api_candidates(message, default_missing_signals=True)
+    selection = _select_api_routes_with_llm(
+        message=message,
+        selection=selection,
+        llm_provider=llm,
+    )
     if selection.is_low_relevance:
         response = _build_insufficient_information_response(selection)
         response.warnings.extend(warnings)
@@ -179,11 +188,15 @@ def _classify_scope_with_llm(
                         content=(
                             "사용자 질문이 국내 관광 질문인지 분류하세요. "
                             "반드시 domestic_tourism 또는 out_of_scope 중 "
-                            "하나의 라벨만 답하세요. 자연스러운 한국어 표현도 "
-                            "고려하세요. 국내 여행, 관광, 장소, 명소, 음식, 숙소, "
-                            "축제, 산책, 스키장, 여행 코스, 갈 만한 곳을 묻는 "
-                            "질문이면 domestic_tourism입니다. 해외 여행이나 "
-                            "관광과 무관한 질문은 out_of_scope입니다."
+                            "하나의 라벨만 답하세요. 자연스러운 한국어 표현과 "
+                            "짧은 구어체도 고려하세요. 국내 여행, 관광, 장소, "
+                            "명소, 음식, 숙소, 축제, 산책, 스키장, 여행 코스, "
+                            "갈 만한 곳을 묻는 질문이면 domestic_tourism입니다. "
+                            "예: 부산 축제 알려줘 -> domestic_tourism, "
+                            "전주 맛집 추천 -> domestic_tourism, "
+                            "제주 숙소 알려줘 -> domestic_tourism, "
+                            "강릉 1박 2일 루트 짜줘 -> domestic_tourism. "
+                            "해외 여행이나 관광과 무관한 질문은 out_of_scope입니다."
                         ),
                     ),
                     LLMMessage(role="user", content=message),
@@ -198,7 +211,7 @@ def _classify_scope_with_llm(
             reason="llm_scope_classification_failed",
         )
 
-    classification = llm_response.text.strip().lower().strip("\"'`.,:;")
+    classification = _parse_scope_label(llm_response.text)
     if classification == "domestic_tourism":
         return ScopeClassification(label="domestic_tourism")
     if classification == "out_of_scope":
@@ -209,6 +222,171 @@ def _classify_scope_with_llm(
     return ScopeClassification(
         label="out_of_scope",
         reason="llm_scope_classification_malformed",
+    )
+
+
+def _parse_scope_label(text: str) -> str | None:
+    normalized = _strip_markdown_code_fence(text.strip())
+    json_label = _parse_scope_label_json(normalized)
+    if json_label is not None:
+        return json_label
+    return _parse_scope_label_plain(normalized)
+
+
+def _parse_scope_label_json(text: str) -> str | None:
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    if isinstance(payload, str):
+        return _parse_scope_label_plain(payload)
+    if isinstance(payload, dict):
+        label = payload.get("label")
+        if isinstance(label, str):
+            return _parse_scope_label_plain(label)
+    return None
+
+
+def _parse_scope_label_plain(text: str) -> str | None:
+    normalized = text.strip().lower().strip("` \n\t.,:;!?'\"")
+    if normalized in SUPPORTED_SCOPE_LABELS:
+        return normalized
+    for label in SUPPORTED_SCOPE_LABELS:
+        if any(normalized == f"{label}{suffix}" for suffix in KOREAN_LABEL_SUFFIXES):
+            return label
+    return None
+
+
+def _strip_markdown_code_fence(text: str) -> str:
+    stripped = text.strip()
+    if not stripped.startswith("```") or not stripped.endswith("```"):
+        return stripped
+    lines = stripped.splitlines()
+    if len(lines) < 3:
+        return stripped
+    return "\n".join(lines[1:-1]).strip()
+
+
+def _select_api_routes_with_llm(
+    *,
+    message: str,
+    selection: CandidateSelection,
+    llm_provider: LLMProvider | None,
+) -> CandidateSelection:
+    if llm_provider is None or not selection.candidates:
+        return selection
+
+    prompt = _api_route_prompt(message=message, selection=selection)
+    try:
+        llm_response = llm_provider.complete(
+            LLMRequest(
+                messages=(
+                    LLMMessage(
+                        role="system",
+                        content=(
+                            "Choose the best Korea Tourism API route candidates. "
+                            'Return only strict JSON: {"ids":["candidate_id"]}. '
+                            "Use only IDs from the api route candidates list."
+                        ),
+                    ),
+                    LLMMessage(role="user", content=prompt),
+                ),
+                max_tokens=80,
+                temperature=0,
+            )
+        )
+    except LLMProviderError:
+        return selection
+    except IndexError:
+        return selection
+
+    selected_ids = _parse_route_candidate_ids(llm_response.text)
+    candidate_by_id = {
+        candidate.api.id: candidate for candidate in selection.candidates
+    }
+    selected_candidates = tuple(
+        candidate_by_id[candidate_id]
+        for candidate_id in selected_ids
+        if candidate_id in candidate_by_id
+    )
+    if not selected_candidates:
+        return selection
+
+    selected_id_set = {candidate.api.id for candidate in selected_candidates}
+    remaining_candidates = tuple(
+        candidate
+        for candidate in selection.candidates
+        if candidate.api.id not in selected_id_set
+    )
+    return CandidateSelection(
+        candidates=selected_candidates + remaining_candidates,
+        matched_regions=selection.matched_regions,
+        matched_categories=selection.matched_categories,
+        is_low_relevance=selection.is_low_relevance,
+        reason=selection.reason,
+    )
+
+
+def _api_route_prompt(*, message: str, selection: CandidateSelection) -> str:
+    candidate_lines = []
+    for candidate in selection.candidates:
+        api = candidate.api
+        region_hint = (
+            ",".join(candidate.matched_regions)
+            if candidate.matched_regions
+            else "nationwide-capable"
+        )
+        category_hint = ",".join(api.categories[:4])
+        candidate_lines.append(
+            f"{api.id}|{api.endpoint}|priority={api.priority}|"
+            f"categories={category_hint}|regions={region_hint}|"
+            f"summary={api.description}|search={api.searchText}"
+        )
+    return (
+        f"question={message}\n"
+        f"detected_regions={','.join(selection.matched_regions) or 'nationwide'}\n"
+        f"detected_categories={','.join(selection.matched_categories) or 'none'}\n"
+        "api route candidates:\n" + "\n".join(candidate_lines)
+    )
+
+
+def _parse_route_candidate_ids(text: str) -> tuple[str, ...]:
+    stripped = text.strip()
+    if not stripped:
+        return ()
+
+    try:
+        payload = json.loads(stripped)
+    except json.JSONDecodeError:
+        cleaned = stripped.strip("` \n\t.,;:'\"")
+        return (cleaned,) if _is_candidate_id(cleaned) else ()
+
+    if isinstance(payload, str):
+        return (payload,) if _is_candidate_id(payload) else ()
+    if isinstance(payload, list):
+        return tuple(
+            item for item in payload if isinstance(item, str) and _is_candidate_id(item)
+        )
+    if isinstance(payload, dict):
+        for key in ("ids", "candidate_ids", "api_ids"):
+            value = payload.get(key)
+            if isinstance(value, list):
+                return tuple(
+                    item
+                    for item in value
+                    if isinstance(item, str) and _is_candidate_id(item)
+                )
+        for key in ("id", "candidate_id", "api_id"):
+            value = payload.get(key)
+            if isinstance(value, str) and _is_candidate_id(value):
+                return (value,)
+    return ()
+
+
+def _is_candidate_id(value: str) -> bool:
+    return bool(value) and all(
+        character.islower() or character.isdigit() or character == "_"
+        for character in value
     )
 
 

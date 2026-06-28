@@ -211,10 +211,11 @@ LLMClient
 2. classifier는 `domestic_tourism` 또는 `out_of_scope` label만 반환한다.
 3. `out_of_scope`이면 외부 검색/Tourism/KMA API 호출 없이 안내 응답을 반환한다.
 4. classifier provider가 없거나 사용할 수 없거나 응답 label이 올바르지 않으면 안전한 범위 안내로 종료한다.
-5. `domestic_tourism`이면 API 라우팅/후보 선택과 답변 생성 경로를 진행한다.
+5. `domestic_tourism`이면 deterministic API 후보 생성 후 compact 후보 메타데이터를 LLM에 전달해 API route 순서를 선택한다.
 6. Upstage 호출 실패 시 설정된 OpenRouter fallback을 시도한다.
-7. 답변 생성 fallback도 실패하면 API 결과 기반의 최소 템플릿 답변 또는 오류 안내를 반환한다.
-8. 답변 생성 응답 토큰은 기본 800 tokens 이내로 제한하고, scope classifier는 작은 prompt와 낮은 `max_tokens`로 운영한다.
+7. API route LLM이 실패하거나 malformed/unknown ID를 반환하면 deterministic metadata scoring 결과로 fallback한다.
+8. 답변 생성 fallback도 실패하면 API 결과 기반의 최소 템플릿 답변 또는 오류 안내를 반환한다.
+9. 답변 생성 응답 토큰은 기본 800 tokens 이내로 제한하고, scope classifier와 route selector는 작은 prompt와 낮은 `max_tokens`로 운영한다.
 
 ## 6.4 모델 후보 결정 필요 항목
 
@@ -246,21 +247,23 @@ POST /api/chat
   ├─ provider 누락/오류/비정상 label → rejection 응답
   └─ domestic_tourism → 계속
   ↓
-6. API 메타데이터 인덱스 검색 및 라우팅 후보 선택
+6. API 메타데이터 인덱스 검색 및 deterministic 라우팅 후보 생성
   ↓
-7. LLM으로 의도 구조화 및 API 호출 계획 생성
+7. LLM에 compact 후보 메타데이터를 전달해 API route 선택
   ↓
-8. 한국관광공사 API 호출
+8. malformed/unknown/error이면 deterministic 후보 순서로 fallback
   ↓
-9. 필요 시 기상청 API 호출
+9. 한국관광공사 API 호출
   ↓
-10. API 응답에 포함된 공식 링크만 보완 조회
+10. 필요 시 기상청 API 호출
   ↓
-11. 답변 생성
+11. API 응답에 포함된 공식 링크만 보완 조회
   ↓
-12. 출처 도메인 정리
+12. 답변 생성
   ↓
-13. 응답 반환
+13. 출처 도메인 정리
+  ↓
+14. 응답 반환
 ```
 
 ---
@@ -303,6 +306,7 @@ POST /api/chat
 - 한국관광공사 관련 공공데이터 API는 전부 메타데이터 후보로 수집한다.
 - 질문과 맞는 API 후보만 선별 호출한다.
 - 질문과 메타데이터 인덱스를 비교해 API 후보를 고른다.
+- 지역이 없는 질문은 서울 등 특정 지역으로 보정하지 않고 전국구 요청으로 처리한다.
 
 ## 9.2 MVP 우선 API 유형
 
@@ -344,7 +348,7 @@ POST /api/chat
 
 ## 10. API 라우팅 / 의미검색
 
-이 단계는 LLM scope classifier가 `domestic_tourism`으로 수락한 질문에만 적용한다. 키워드와 라우팅 메타데이터는 Tourism/KMA API 후보 선택에 사용한다.
+이 단계는 LLM scope classifier가 `domestic_tourism`으로 수락한 질문에만 적용한다. 키워드와 라우팅 메타데이터는 deterministic 후보 생성에 사용하고, compact API 메타데이터는 LLM route selector가 최종 후보 순서를 고르는 데 사용한다.
 
 ## 10.1 MVP 방식
 
@@ -358,12 +362,15 @@ POST /api/chat
 - 동의어 사전
 - API 메타데이터 `searchText`
 - API 카테고리 가중치
+- LLM route selector 입력용 compact 후보 메타데이터: `id`, `endpoint`, 카테고리, 지역/전국구 가능 여부, 우선순위, 설명, `searchText`
 
 ## 10.2 후보 선택
 
 - top-k 기본값: 3
 - 관련 점수가 낮으면 되묻기 또는 정보 부족 응답
 - LLM에는 전체 API 목록이 아니라 top-k 후보만 전달한다.
+- LLM route selector는 strict JSON 후보 ID 목록을 반환해야 하며, 알 수 없는 ID나 malformed output 또는 provider 오류는 deterministic 후보 순서로 fallback한다.
+- 지역이 감지되지 않은 질문은 전국구로 간주하고, 가능한 Tourism API 호출에서 `areaCode`를 생략한다.
 
 ## 10.3 예시 매핑
 
@@ -373,6 +380,7 @@ POST /api/chat
 | “이번 달 서울 축제” | 행사/축제, 지역코드 |
 | “강릉 2박 3일 코스” | 여행코스, 관광정보, 음식점, 숙박 |
 | “제주 비 오는 날 갈 곳” | 관광정보, 키워드 검색, 기상청 API |
+| “스키장 추천해줘” | 전국구 관광정보 |
 
 ---
 

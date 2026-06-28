@@ -257,23 +257,25 @@ Vercel 단일 프로젝트로 배포하되, 디렉토리는 `frontend/`와 `back
   ↓
 3. 질문 의도 추출
   ↓
-4. API 메타데이터 의미검색
+4. API 메타데이터 deterministic 후보 생성
   ↓
-5. 관련 API 후보 선택
+5. LLM route selector가 compact 후보 메타데이터로 관련 API 후보 선택
   ↓
-6. API 파라미터 생성
+6. malformed/unknown/error이면 deterministic 후보 순서로 fallback
   ↓
-7. 한국관광공사 API 호출
+7. API 파라미터 생성
   ↓
-8. 날씨 API 호출 필요 여부 판단 및 호출
+8. 한국관광공사 API 호출
   ↓
-9. 허용 출처 보완 조회 필요 여부 판단
+9. 날씨 API 호출 필요 여부 판단 및 호출
   ↓
-10. 답변 생성
+10. 허용 출처 보완 조회 필요 여부 판단
   ↓
-11. 출처 도메인 정리
+11. 답변 생성
   ↓
-12. 응답 반환 및 브라우저 로컬 저장
+12. 출처 도메인 정리
+  ↓
+13. 응답 반환 및 브라우저 로컬 저장
 ```
 
 ## 6.2 국내 관광 Guard
@@ -286,7 +288,8 @@ Vercel 단일 프로젝트로 배포하되, 디렉토리는 `frontend/`와 `back
 2. provider는 adapter와 provider/fallback 설정으로 교체 가능하게 둔다.
 3. provider 누락, provider 오류, malformed label은 안전한 범위 안내로 종료한다.
 4. public 응답의 경고는 사용자에게 노출하지 않고 `warnings: []`로 유지한다.
-5. 키워드/지역명/관광 카테고리 신호는 scope 수락 이후 Tourism/KMA API 후보 선택에 사용한다.
+5. 키워드/지역명/관광 카테고리 신호는 scope 수락 이후 deterministic API 후보 생성에 사용하고, compact 후보 메타데이터는 LLM route selector에 전달한다.
+6. 지역이 감지되지 않으면 서울 기본값을 넣지 않고 전국구로 처리한다.
 
 거절 조건 예:
 
@@ -320,6 +323,7 @@ LLM은 다음 단계에서 사용할 수 있다.
 - 답변에 필요한 컨텍스트만 주입
 - 소형 모델 우선
 - 모델 교체 가능한 어댑터 구조
+- API route selector는 top-k 후보의 compact 메타데이터만 전달하고 strict JSON 후보 ID를 요구한다.
 - 브라우저 세션당 10회 질문 제한
 - scope classifier의 작은 prompt와 낮은 `max_tokens`
 - provider/fallback 설정

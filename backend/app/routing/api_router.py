@@ -49,7 +49,6 @@ CATEGORY_SYNONYMS: dict[str, tuple[str, ...]] = {
 
 MIN_RELEVANCE_SCORE = 3
 DEFAULT_TOP_K = 3
-DEFAULT_REGION = "서울"
 DEFAULT_CATEGORY = "attraction"
 
 
@@ -80,19 +79,14 @@ def select_api_candidates(
     normalized = _normalize(message)
     matched_regions = _matched_regions(normalized)
     matched_categories = _matched_categories(normalized)
-    if matched_categories and not matched_regions:
-        matched_regions = (DEFAULT_REGION,)
     if (
         matched_regions
         and not matched_categories
         and _has_defaultable_tourism_intent(normalized)
     ):
         matched_categories = (DEFAULT_CATEGORY,)
-    if default_missing_signals:
-        if not matched_regions:
-            matched_regions = (DEFAULT_REGION,)
-        if not matched_categories:
-            matched_categories = (DEFAULT_CATEGORY,)
+    if default_missing_signals and not matched_categories:
+        matched_categories = (DEFAULT_CATEGORY,)
     scored_candidates = tuple(
         candidate
         for api in load_tour_api_metadata_index().apis
@@ -119,7 +113,7 @@ def select_api_candidates(
             reason="low_relevance_no_api_candidate",
         )
 
-    if not matched_regions or not matched_categories:
+    if not matched_categories:
         return CandidateSelection(
             candidates=candidates,
             matched_regions=matched_regions,
@@ -223,7 +217,11 @@ def _companion_api_score(
     matched_categories: tuple[str, ...],
 ) -> int:
     category_set = set(matched_categories)
-    if api_id == "detail_common" and category_set & {"attraction", "indoor", "outdoor"}:
+    if (
+        api_id == "detail_common"
+        and matched_regions
+        and category_set & {"attraction", "indoor", "outdoor"}
+    ):
         return 7
     if api_id == "area_code" and matched_regions and "festival" in category_set:
         return 5

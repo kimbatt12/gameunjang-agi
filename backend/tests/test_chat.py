@@ -1,6 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from app.chat_service import _parse_scope_label
 from app.config import get_settings
 from app.external.llm import LLMProviderError, LLMResponse
 from app.external.weather import WeatherResult
@@ -120,11 +121,8 @@ def test_chat_rejects_foreign_travel_question_after_llm_classification() -> None
 @pytest.mark.parametrize(
     "message,expected_area_code",
     [
-        ("이번 주말에 갈만한데 있어?", "1"),
-        ("이번 주말에 갈만한 국내 관광지 있어?", "1"),
         ("이번 주말에 부산가려는데 어디갈까?", "6"),
         ("서울에서 뭐 하지?", "1"),
-        ("스키장 추천해줘", "1"),
         ("서울 산책할 만한 곳 추천해줘", "1"),
     ],
 )
@@ -133,7 +131,7 @@ def test_chat_accepts_natural_domestic_tourism_after_llm_classification(
     expected_area_code,
 ) -> None:
     tourism_client = _RecordingTourismClient({"response": {"body": {"items": {}}}})
-    llm_provider = _SequenceLLMProvider(["domestic_tourism", "weather answer"])
+    llm_provider = _SequenceLLMProvider(["domestic_tourism", "area_based_list"])
     client = TestClient(
         create_app(tourism_client=tourism_client, llm_provider=llm_provider)
     )
@@ -154,7 +152,7 @@ def test_chat_accepts_natural_domestic_tourism_after_llm_classification(
 def test_chat_relaxes_natural_tourism_question_without_region(caplog) -> None:
     caplog.set_level("INFO", logger="app.chat_service")
     tourism_client = _RecordingTourismClient({"response": {"body": {"items": {}}}})
-    llm_provider = _SequenceLLMProvider(["domestic_tourism"])
+    llm_provider = _SequenceLLMProvider(["domestic_tourism", "area_based_list"])
     client = TestClient(
         create_app(tourism_client=tourism_client, llm_provider=llm_provider)
     )
@@ -168,9 +166,13 @@ def test_chat_relaxes_natural_tourism_question_without_region(caplog) -> None:
     assert "정보가 부족합니다" not in payload["answer"]
     assert "국내 지역명" not in payload["answer"]
     assert tourism_client.calls
-    assert tourism_client.calls[0][1]["areaCode"] == "1"
+    assert "areaCode" not in tourism_client.calls[0][1]
     assert payload["warnings"] == []
     assert _classification_prompts(llm_provider) == ["이번 주말에 갈만한데 있어?"]
+    route_prompt = _routing_prompts(llm_provider)[0]
+    assert "area_based_list|areaBasedList2" in route_prompt
+    assert "regions=nationwide-capable" in route_prompt
+    assert "question=이번 주말에 갈만한데 있어?" in route_prompt
     _assert_logged_chat_warnings(
         caplog,
         response_type="answer",
@@ -180,7 +182,7 @@ def test_chat_relaxes_natural_tourism_question_without_region(caplog) -> None:
 
 def test_chat_relaxes_natural_domestic_tourism_question_without_region() -> None:
     tourism_client = _RecordingTourismClient({"response": {"body": {"items": {}}}})
-    llm_provider = _SequenceLLMProvider(["domestic_tourism"])
+    llm_provider = _SequenceLLMProvider(["domestic_tourism", "area_based_list"])
     client = TestClient(
         create_app(tourism_client=tourism_client, llm_provider=llm_provider)
     )
@@ -195,13 +197,14 @@ def test_chat_relaxes_natural_domestic_tourism_question_without_region() -> None
     assert payload["isTourismRelated"] is True
     assert "정보가 부족합니다" not in payload["answer"]
     assert tourism_client.calls
-    assert tourism_client.calls[0][1]["areaCode"] == "1"
+    assert tourism_client.calls[0][0] == "areaBasedList2"
+    assert "areaCode" not in tourism_client.calls[0][1]
     assert payload["warnings"] == []
 
 
 def test_chat_relaxes_region_without_explicit_category_to_attraction_flow() -> None:
     tourism_client = _RecordingTourismClient({"response": {"body": {"items": {}}}})
-    llm_provider = _SequenceLLMProvider(["domestic_tourism"])
+    llm_provider = _SequenceLLMProvider(["domestic_tourism", "tour_course"])
     client = TestClient(
         create_app(tourism_client=tourism_client, llm_provider=llm_provider)
     )
@@ -217,6 +220,89 @@ def test_chat_relaxes_region_without_explicit_category_to_attraction_flow() -> N
     assert "관광 유형" not in payload["answer"]
     assert tourism_client.calls
     assert tourism_client.calls[0][1]["areaCode"] == "6"
+    assert payload["warnings"] == []
+
+
+def test_chat_uses_known_llm_route_candidate_id() -> None:
+    tourism_client = _RecordingTourismClient({"response": {"body": {"items": {}}}})
+    llm_provider = _SequenceLLMProvider(["domestic_tourism", "search_festival"])
+    client = TestClient(
+        create_app(tourism_client=tourism_client, llm_provider=llm_provider)
+    )
+
+    response = client.post("/api/chat", json={"message": "국내 축제 알려줘"})
+
+    assert response.status_code == 200
+    assert tourism_client.calls
+    assert tourism_client.calls[0][0] == "searchFestival2"
+    assert "areaCode" not in tourism_client.calls[0][1]
+    assert _routing_prompts(llm_provider)
+
+
+def test_chat_accepts_busan_festival_question_with_llm_route_candidate() -> None:
+    tourism_client = _RecordingTourismClient({"response": {"body": {"items": {}}}})
+    llm_provider = _SequenceLLMProvider(["domestic_tourism", "search_festival"])
+    client = TestClient(
+        create_app(tourism_client=tourism_client, llm_provider=llm_provider)
+    )
+
+    response = client.post("/api/chat", json={"message": "부산 축제 알려줘"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["type"] == "answer"
+    assert payload["isTourismRelated"] is True
+    assert tourism_client.calls
+    assert tourism_client.calls[0][0] == "searchFestival2"
+    assert tourism_client.calls[0][1]["areaCode"] == "6"
+    assert payload["warnings"] == []
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ('{"label":"domestic_tourism"}', "domestic_tourism"),
+        ("domestic_tourism입니다", "domestic_tourism"),
+        ('```json\n{"label":"out_of_scope"}\n```', "out_of_scope"),
+    ],
+)
+def test_scope_label_parsing_accepts_harmless_extra_text(
+    text,
+    expected,
+) -> None:
+    assert _parse_scope_label(text) == expected
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "domestic_tourism 또는 out_of_scope",
+        "국내 관광 질문입니다",
+        "not domestic_tourism",
+        "domestic_tourism is wrong",
+    ],
+)
+def test_scope_label_parsing_fails_closed_for_both_or_no_labels(text) -> None:
+    assert _parse_scope_label(text) is None
+
+
+def test_chat_falls_back_when_llm_route_output_is_unknown_without_seoul_default() -> (
+    None
+):
+    tourism_client = _RecordingTourismClient({"response": {"body": {"items": {}}}})
+    llm_provider = _SequenceLLMProvider(["domestic_tourism", "not_an_api_id"])
+    client = TestClient(
+        create_app(tourism_client=tourism_client, llm_provider=llm_provider)
+    )
+
+    response = client.post("/api/chat", json={"message": "스키장 추천해줘"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["type"] == "answer"
+    assert payload["isTourismRelated"] is True
+    assert tourism_client.calls
+    assert "areaCode" not in tourism_client.calls[0][1]
     assert payload["warnings"] == []
 
 
@@ -409,9 +495,9 @@ def test_chat_response_schema_includes_consistent_fields() -> None:
     assert isinstance(payload["warnings"], list)
 
 
-def test_chat_defaults_region_when_region_is_missing() -> None:
+def test_chat_routes_nationwide_when_region_is_missing() -> None:
     tourism_client = _RecordingTourismClient({"response": {"body": {"items": {}}}})
-    llm_provider = _SequenceLLMProvider(["domestic_tourism"])
+    llm_provider = _SequenceLLMProvider(["domestic_tourism", "search_festival"])
     client = TestClient(
         create_app(tourism_client=tourism_client, llm_provider=llm_provider)
     )
@@ -424,7 +510,7 @@ def test_chat_defaults_region_when_region_is_missing() -> None:
     assert payload["isTourismRelated"] is True
     assert "국내 지역명" not in payload["answer"]
     assert tourism_client.calls
-    assert tourism_client.calls[0][1]["areaCode"] == "1"
+    assert "areaCode" not in tourism_client.calls[0][1]
     assert payload["items"] == []
     assert set(payload["sourceDomains"]).issubset({"data.go.kr", "visitkorea.or.kr"})
     assert payload["warnings"] == []
@@ -472,7 +558,11 @@ def test_chat_answerable_tourism_question_uses_tourism_api_and_llm(caplog) -> No
         }
     )
     llm_provider = _SequenceLLMProvider(
-        ["domestic_tourism", "LLM composed answer using 강릉 바다 커피거리 코스"]
+        [
+            "domestic_tourism",
+            "tour_course",
+            "LLM composed answer using 강릉 바다 커피거리 코스",
+        ]
     )
     client = TestClient(
         create_app(tourism_client=tourism_client, llm_provider=llm_provider)
@@ -497,8 +587,8 @@ def test_chat_answerable_tourism_question_uses_tourism_api_and_llm(caplog) -> No
         warnings=["api_data_first_answer", "llm_composed_answer"],
     )
     assert payload["answer"] == "LLM composed answer using 강릉 바다 커피거리 코스"
-    assert len(llm_provider.requests) == 2
-    prompt = llm_provider.requests[1].messages[-1].content
+    assert len(llm_provider.requests) == 3
+    prompt = llm_provider.requests[2].messages[-1].content
     assert "강릉 바다 커피거리 코스" in prompt
     assert "오죽헌 역사 산책 코스" in prompt
 
@@ -541,7 +631,11 @@ def test_llm_scope_classification_can_continue_to_answer_flow(caplog) -> None:
         }
     )
     llm_provider = _SequenceLLMProvider(
-        ["domestic_tourism", "LLM composed answer using 전주 한옥마을 산책"]
+        [
+            "domestic_tourism",
+            "search_keyword",
+            "LLM composed answer using 전주 한옥마을 산책",
+        ]
     )
     client = TestClient(
         create_app(tourism_client=tourism_client, llm_provider=llm_provider)
@@ -554,7 +648,7 @@ def test_llm_scope_classification_can_continue_to_answer_flow(caplog) -> None:
     assert payload["type"] == "answer"
     assert payload["isTourismRelated"] is True
     assert tourism_client.calls
-    assert len(llm_provider.requests) == 2
+    assert len(llm_provider.requests) == 3
     assert payload["answer"] == "LLM composed answer using 전주 한옥마을 산책"
     assert payload["warnings"] == []
     _assert_logged_chat_warnings(
@@ -680,7 +774,9 @@ def test_chat_weather_question_calls_weather_api_when_injected() -> None:
             warnings=("weather_api_unavailable",),
         )
     )
-    llm_provider = _SequenceLLMProvider(["domestic_tourism", "weather answer"])
+    llm_provider = _SequenceLLMProvider(
+        ["domestic_tourism", "area_based_list", "weather answer"]
+    )
     client = TestClient(
         create_app(
             tourism_client=tourism_client,
@@ -735,7 +831,9 @@ def test_chat_weather_question_uses_tour_api_service_key_for_default_weather_cli
     monkeypatch.setattr("app.chat_service.KoreaWeatherClient", recording_weather_client)
     get_settings.cache_clear()
     try:
-        llm_provider = _SequenceLLMProvider(["domestic_tourism", "weather answer"])
+        llm_provider = _SequenceLLMProvider(
+            ["domestic_tourism", "area_based_list", "weather answer"]
+        )
         client = TestClient(
             create_app(tourism_client=tourism_client, llm_provider=llm_provider)
         )
@@ -867,6 +965,14 @@ def _classification_prompts(llm_provider) -> list[str]:
         for request in llm_provider.requests
         if "domestic_tourism" in request.messages[0].content
         and "out_of_scope" in request.messages[0].content
+    ]
+
+
+def _routing_prompts(llm_provider) -> list[str]:
+    return [
+        request.messages[-1].content
+        for request in llm_provider.requests
+        if "api route candidates" in request.messages[0].content
     ]
 
 
