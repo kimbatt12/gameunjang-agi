@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from app.answer_generation import compose_answer
 from app.cost_control import CostControlSnapshot, evaluate_cost_controls
+from app.external.llm import LLMResponse
 from app.external.tourism import NormalizedTourismItem
 from app.main import create_app
 from app.routing import select_api_candidates
@@ -19,7 +20,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_mvp_chat_smoke_answers_mobile_domestic_tourism_question() -> None:
-    client = TestClient(create_app())
+    llm_provider = _ClassificationLLMProvider()
+    client = TestClient(create_app(llm_provider=llm_provider))
 
     response = client.post(
         "/api/chat",
@@ -45,6 +47,7 @@ def test_mvp_chat_smoke_answers_mobile_domestic_tourism_question() -> None:
         "sourceDomains",
         "warnings",
     }
+    assert len(llm_provider.requests) == 1
 
 
 def test_mvp_api_candidate_selection_matches_question_intent() -> None:
@@ -164,3 +167,18 @@ def test_mvp_metadata_contains_only_placeholder_free_public_domains() -> None:
     assert source_domains <= {"data.go.kr", "visitkorea.or.kr"}
     assert "SECRET" not in metadata_text.upper()
     assert "PASSWORD" not in metadata_text.upper()
+
+
+class _ClassificationLLMProvider:
+    name = "classification-llm"
+
+    def __init__(self) -> None:
+        self.requests = []
+
+    def complete(self, request):
+        self.requests.append(request)
+        return LLMResponse(
+            text="domestic_tourism",
+            provider=self.name,
+            model="test-model",
+        )

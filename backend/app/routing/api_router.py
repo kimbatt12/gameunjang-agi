@@ -14,7 +14,28 @@ REGION_SYNONYMS: dict[str, tuple[str, ...]] = {
 }
 
 CATEGORY_SYNONYMS: dict[str, tuple[str, ...]] = {
-    "attraction": ("관광", "관광지", "명소", "가볼만", "갈만한", "추천"),
+    "attraction": (
+        "관광",
+        "관광지",
+        "명소",
+        "가볼만",
+        "갈 만한",
+        "갈 만한데",
+        "갈만한",
+        "갈만한데",
+        "어디갈까",
+        "어디 갈까",
+        "갈 곳",
+        "갈곳",
+        "갈 데",
+        "갈데",
+        "놀러",
+        "나들이",
+        "데이트",
+        "아이랑",
+        "가족이랑",
+        "추천",
+    ),
     "indoor": ("실내", "비 오는 날", "비오는날", "박물관", "미술관"),
     "outdoor": ("야외", "해수욕장", "바다", "공원", "둘레길"),
     "festival": ("축제", "행사", "이벤트", "공연", "이번 달", "이번달"),
@@ -28,6 +49,8 @@ CATEGORY_SYNONYMS: dict[str, tuple[str, ...]] = {
 
 MIN_RELEVANCE_SCORE = 3
 DEFAULT_TOP_K = 3
+DEFAULT_REGION = "서울"
+DEFAULT_CATEGORY = "attraction"
 
 
 @dataclass(frozen=True)
@@ -49,11 +72,27 @@ class CandidateSelection:
 
 
 def select_api_candidates(
-    message: str, top_k: int = DEFAULT_TOP_K
+    message: str,
+    top_k: int = DEFAULT_TOP_K,
+    *,
+    default_missing_signals: bool = False,
 ) -> CandidateSelection:
     normalized = _normalize(message)
     matched_regions = _matched_regions(normalized)
     matched_categories = _matched_categories(normalized)
+    if matched_categories and not matched_regions:
+        matched_regions = (DEFAULT_REGION,)
+    if (
+        matched_regions
+        and not matched_categories
+        and _has_defaultable_tourism_intent(normalized)
+    ):
+        matched_categories = (DEFAULT_CATEGORY,)
+    if default_missing_signals:
+        if not matched_regions:
+            matched_regions = (DEFAULT_REGION,)
+        if not matched_categories:
+            matched_categories = (DEFAULT_CATEGORY,)
     scored_candidates = tuple(
         candidate
         for api in load_tour_api_metadata_index().apis
@@ -152,6 +191,13 @@ def _matched_categories(normalized_message: str) -> tuple[str, ...]:
         category
         for category, synonyms in CATEGORY_SYNONYMS.items()
         if any(synonym.lower() in normalized_message for synonym in synonyms)
+    )
+
+
+def _has_defaultable_tourism_intent(normalized_message: str) -> bool:
+    return any(
+        synonym.lower() in normalized_message
+        for synonym in CATEGORY_SYNONYMS[DEFAULT_CATEGORY]
     )
 
 
